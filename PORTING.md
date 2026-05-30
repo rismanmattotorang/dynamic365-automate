@@ -156,11 +156,14 @@ only as they land, so the tree always compiles.
   - Observability audit field `sap_system`→`environment`; metrics `sap_rfc_calls_total`→`d365_service_calls_total`, etc.
 - **Exit:** 86 tests pass, clippy clean. ✅ *Done — see CHANGELOG 0.2.0.*
 
-### Phase 3 — Dynamics 365 backend tier *(the core engineering)*
-- **`d365-automate-odata`** (was `sap-automate-rfc`): F&O OData v4 client, Custom Service caller, `$batch` change-set transaction model, Entra OAuth2 client-credentials auth, metadata cache, retry/pool, Infolog/error taxonomy. Replaces RFC/BAPI/SOAP-RFC.
-- **`d365-automate-meta`** (was `sap-automate-adt`): Metadata API client (`DataEntities`, `EntityMetadatas`), X++ object readers, cross-reference (`where_used`), gated build/deploy, HTTP + mock clients, fixture tests.
-- Re-ground all fixtures (entities, services, security) in D365 canon; port correctness tests per §4.
-- **Exit:** mock-client fixture tests + D365 precision tests pass.
+### ✅ Phase 3 — Dynamics 365 backend tier *(done; live transports → 3b)*
+- **`d365-automate-odata`** (was `sap-automate-rfc`): the `D365Client` trait (mirrors `SapClient`) + `MockD365Client` with GL/SCM/Sales fixtures; `$batch` change-set transaction model (replaces `BAPI_TRANSACTION_COMMIT`); `infolog` parser (replaces `bapiret2`); Entra ID OAuth2 credential providers; metadata-cache decorator; pool; retry/circuit-breaker; `D365Error` taxonomy.
+- **`d365-automate-meta`** (was `sap-automate-adt`): the `MetadataClient` trait (mirrors `AdtClient`) + `MockMetadataClient` with the GTFin/GTScm X++ fixtures; `XppObjectKind` (AOT object kinds); cross-reference (`where_used`); gated `deploy` (`activate`); `MetaError` taxonomy; connection model with Entra auth.
+- Re-grounded fixtures (entities, services, security) in D365 canon and ported the correctness invariants per §4 (`every_write_operation_uses_changeset`, `every_company_scoped_entity_has_dataareaid_key`, `general_journal_account_entry_is_the_subledger_truth`, …).
+- **Exit:** 130 tests pass (44 new), clippy clean. ✅ *Done — see CHANGELOG 0.3.0.*
+
+### Phase 3b — live transports *(deferred)*
+- `HttpD365Client` (F&O OData v4 + Custom Service + `$batch` over Entra OAuth2) behind the `http` feature; live Metadata API client behind `d365-automate-meta/http`; connection-file loaders. The mock remains the default so CI without an environment is unaffected — mirroring the source's own "mock now, live later" phasing. Phase 4 (server) runs against the mock, so it is unblocked.
 
 ### Phase 4 — MCP server (tools / resources / prompts / seed)
 - Re-map the 37 tools to `d365.*` / `xpp.meta.*` (full crosswalk in §6), 12 resources to `d365-*://`, 16 prompts, and the seed corpus.

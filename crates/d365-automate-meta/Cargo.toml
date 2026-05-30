@@ -1,0 +1,24 @@
+[package]
+name = "d365-automate-meta"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "D365-Automate Metadata API / X++ (AOT) client for Dynamics 365 Finance & Operations."
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+async-trait = { workspace = true }
+
+# Live Metadata API client (Phase 3b) is feature-gated; the mock needs no network.
+reqwest = { workspace = true, optional = true }
+toml = { workspace = true, optional = true }
+
+[features]
+default = []
+http = ["reqwest", "toml"]
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

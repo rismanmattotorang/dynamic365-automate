@@ -35,7 +35,7 @@
 | 0 | Foundation & branding | ✅ Done |
 | 1 | MCP protocol core (`mcp-core/-transport/-server/-client`) | ✅ Done — 18 tests passing |
 | 2 | ERP-agnostic engines + agentic layer (`kb`/`rag`/`graph`/`ingest`/`memory`/`scheduler`/`channels`/`skills`/`observability`/`connectors`) | ✅ Done — 86 tests passing |
-| 3 | Dynamics 365 backend tier (`d365-automate-odata`, `d365-automate-meta`) | ⏳ Planned |
+| 3 | Dynamics 365 backend tier (`d365-automate-odata`, `d365-automate-meta`) | ✅ Done — 130 tests passing (live HTTP transports → 3b) |
 | 4 | MCP server: tools / resources / prompts / seed | ⏳ Planned |
 | 5 | Apps (TUI, gateway, ingest, bench, samples) | ⏳ Planned |
 | 6 | Web UI (Next.js) | ⏳ Planned |

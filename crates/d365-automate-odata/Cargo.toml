@@ -1,0 +1,26 @@
+[package]
+name = "d365-automate-odata"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "D365-Automate OData v4 / Custom Service client abstraction for Dynamics 365 Finance & Operations."
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+async-trait = { workspace = true }
+tokio = { workspace = true }
+
+# Live transports (Phase 3b) are feature-gated; the mock needs no network.
+reqwest = { workspace = true, optional = true }
+url = { workspace = true, optional = true }
+
+[features]
+default = []
+# Live F&O OData v4 client over Microsoft Entra ID OAuth2 (lands in Phase 3b).
+http = ["reqwest", "url"]
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

@@ -227,7 +227,7 @@ dependencies = [
 
 [[package]]
 name = "d365-automate-channels"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "serde",
@@ -239,7 +239,7 @@ dependencies = [
 
 [[package]]
 name = "d365-automate-connectors"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -249,7 +249,7 @@ dependencies = [
 
 [[package]]
 name = "d365-automate-graph"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -260,7 +260,7 @@ dependencies = [
 
 [[package]]
 name = "d365-automate-ingest"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "d365-automate-kb",
@@ -278,7 +278,7 @@ dependencies = [
 
 [[package]]
 name = "d365-automate-kb"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "hex",
@@ -293,19 +293,33 @@ dependencies = [
 
 [[package]]
 name = "d365-automate-memory"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
  "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "d365-automate-meta"
+version = "0.3.0"
+dependencies = [
+ "async-trait",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "toml",
  "tracing",
 ]
 
 [[package]]
 name = "d365-automate-observability"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "serde",
@@ -316,8 +330,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "d365-automate-odata"
+version = "0.3.0"
+dependencies = [
+ "async-trait",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+ "url",
+]
+
+[[package]]
 name = "d365-automate-rag"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "d365-automate-graph",
@@ -330,7 +358,7 @@ dependencies = [
 
 [[package]]
 name = "d365-automate-scheduler"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "serde",
@@ -343,7 +371,7 @@ dependencies = [
 
 [[package]]
 name = "d365-automate-skills"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -1003,7 +1031,7 @@ checksum = "0e7465ac9959cc2b1404e8e2367b43684a6d13790fe23056cc8c6c5a6b7bcb94"
 
 [[package]]
 name = "mcp-client"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "futures",
@@ -1017,7 +1045,7 @@ dependencies = [
 
 [[package]]
 name = "mcp-core"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -1027,7 +1055,7 @@ dependencies = [
 
 [[package]]
 name = "mcp-server"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "futures",
@@ -1043,7 +1071,7 @@ dependencies = [
 
 [[package]]
 name = "mcp-transport"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "axum",

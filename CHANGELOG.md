@@ -10,6 +10,60 @@ GaussianTech. See [`PORTING.md`](PORTING.md) for the phased strategy.
 
 ---
 
+## [0.3.0] — 2026-05-30 · Dynamics 365 backend tier (Phase 3)
+
+The core engineering of the port: rewrites the two SAP backend crates against
+the Dynamics 365 F&O backend tier. The trait shapes are preserved so the
+Phase 4 server ports with minimal churn.
+
+### Added — `d365-automate-odata` (was `sap-automate-rfc`)
+
+- `D365Client` trait (mirrors `SapClient`): `environment_info`, `search_service`,
+  `service_metadata`, `bulk_service_metadata`, `call_service`, `read_entity`,
+  `entity_structure`.
+- `MockD365Client` with realistic GL / SCM / Sales fixtures (services + data
+  entities), legal-entity (`DataAreaId`) scoping on reads.
+- `transaction`: atomic OData **`$batch` change-set** write orchestration
+  (`execute_write_operation`) — replaces SAP's `BAPI_TRANSACTION_COMMIT` two-phase
+  protocol; never auto-commits, fail-closed on unconfirmed outcomes.
+- `infolog`: OData error / Infolog parser (replaces the `bapiret2` parser).
+- `credentials`: Microsoft Entra ID OAuth2 client-credentials providers
+  (env / static / layered) — replaces SAP logon / XSUAA.
+- `metadata_cache` TTL decorator, `pool`, `retry` + circuit breaker, and the
+  `D365Error` taxonomy — ported from the RFC crate.
+- Dynamics 365 correctness invariants (ported from `SAP_CORRECTNESS`):
+  `every_write_operation_uses_changeset`, `every_write_operation_returns_operation_status`,
+  `every_operation_references_a_security_privilege`,
+  `every_company_scoped_entity_has_dataareaid_key`,
+  `item_number_follows_released_product_convention`,
+  `general_journal_account_entry_is_the_subledger_truth`,
+  `legacy_tables_map_to_data_entities`.
+
+### Added — `d365-automate-meta` (was `sap-automate-adt`)
+
+- `MetadataClient` trait (mirrors `AdtClient`): `get_class` / `get_interface` /
+  `get_table` / `get_job` / `get_form` / `get_model_contents` / `get_data_entity`,
+  `search`, `cross_reference` (was `where_used`), `get_entity_contents`,
+  and gated `deploy` (was `activate`).
+- `MockMetadataClient` seeded with the GTFin / GTScm X++ fixtures that mirror
+  the knowledge-graph seed; cross-reference wiring for impact analysis.
+- `XppObjectKind` (AOT object kinds), `connection` model with Entra auth, and
+  the `MetaError` taxonomy.
+
+### Deferred to Phase 3b
+
+- Live `HttpD365Client` (OData v4 + `$batch` over Entra OAuth2) and the live
+  Metadata API client, behind the `http` feature. The mock is the default;
+  Phase 4 runs against it.
+
+### Verified
+
+- `cargo build --all-features` — clean.
+- `cargo clippy --all-features` — no warnings.
+- `cargo test --all-features` — **130 passing** (86 + 44 new: 34 odata, 10 meta).
+
+---
+
 ## [0.2.0] — 2026-05-30 · ERP-agnostic engines + agentic layer (Phase 2)
 
 Ports the ten ERP-agnostic engine and agentic crates and re-grounds their

@@ -17,9 +17,10 @@ members = [
     "crates/d365-automate-channels",
     "crates/d365-automate-connectors",
     "crates/d365-automate-observability",
-    # ── Dynamics 365 crates land in later porting phases (see PORTING.md):
-    #   "crates/d365-automate-odata",       # Phase 3 — F&O OData/Custom Service client
-    #   "crates/d365-automate-meta",        # Phase 3 — X++/AOT metadata client
+    # ── Dynamics 365 backend tier (Phase 3) ─────────────────────────────
+    "crates/d365-automate-odata",
+    "crates/d365-automate-meta",
+    # ── Apps land in later porting phases (see PORTING.md):
     #   "apps/d365-automate-server",        # Phase 4
     #   "apps/d365-automate-ingest",        # Phase 5
     #   "apps/d365-automate-bench",         # Phase 5
@@ -30,7 +31,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 rust-version = "1.80"
 license = "Apache-2.0"
@@ -73,6 +74,10 @@ d365-automate-scheduler = { path = "crates/d365-automate-scheduler" }
 d365-automate-channels = { path = "crates/d365-automate-channels" }
 d365-automate-connectors = { path = "crates/d365-automate-connectors" }
 d365-automate-observability = { path = "crates/d365-automate-observability" }
+
+# Internal crates — Dynamics 365 backend tier
+d365-automate-odata = { path = "crates/d365-automate-odata" }
+d365-automate-meta = { path = "crates/d365-automate-meta" }
 
 # HTTP / web
 axum = "0.7"
