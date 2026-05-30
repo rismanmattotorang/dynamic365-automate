@@ -171,9 +171,10 @@ only as they land, so the tree always compiles.
 - **Swappable backends (per request):** the server holds `Arc<dyn D365Client>` + `Arc<dyn MetadataClient>`, defaulting to the mocks. Pointing at a live environment is a one-site change in `lib.rs` / `main.rs` (construct the Phase 3b `HttpD365Client` instead of the mock) — no tool/resource/prompt code changes.
 - **Exit:** binary runs (stdio + HTTP `/health`, `/metrics`, `/mcp`); 137 tests pass (7 new server integration tests), clippy clean. ✅ *Done — see CHANGELOG 0.4.0.*
 
-### Phase 5 — Apps
-- `d365-automate-tui` (Ratatui console), `d365-automate-gw` (gateway), `d365-automate-ingest`, `d365-automate-bench`, `sample-server`/`sample-client`.
-- **Exit:** all binaries build; bench runs against the seeded corpus.
+### ✅ Phase 5 — Apps *(done)*
+- Ported `d365-automate-tui` (Ratatui console), `d365-automate-gw` (multi-channel gateway), `d365-automate-ingest` (CLI), `d365-automate-bench`, and `sample-server`/`sample-client`.
+- Re-grounded: TUI synthetic traffic + cache panel, gateway intent router / `match_skill` (D365 skills + keywords) and tool routing, bench workload queries (RAG + graph) and the `./docs/sample-learn-corpus`, ingest crawler (`LearnCrawler`). `sample-client`/`gw` spawn `d365-automate-server` by default.
+- **Exit:** all six binaries build; clippy clean across `--all-targets`; bench passes both acceptance gates against the seeded Learn corpus (RAG P95 0.074 ms, graph multi-hop P95 0.084 ms); `sample-client` drives the server and lists the full D365 tool surface; 137 tests pass. ✅ *Done — see CHANGELOG 0.5.0.*
 
 ### Phase 6 — Web UI
 - Rebrand the Next.js app (Operations / Query Lab / Graph Lab / Tool Explorer / Skill Lab / Resources); relabel SAP→D365 throughout.

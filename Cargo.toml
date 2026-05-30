@@ -22,16 +22,18 @@ members = [
     "crates/d365-automate-meta",
     # ── MCP server (Phase 4) ────────────────────────────────────────────
     "apps/d365-automate-server",
-    #   "apps/d365-automate-ingest",        # Phase 5
-    #   "apps/d365-automate-bench",         # Phase 5
-    #   "apps/d365-automate-tui",           # Phase 5
-    #   "apps/d365-automate-gw",            # Phase 5
-    #   "apps/sample-server",               # Phase 5
-    #   "apps/sample-client",               # Phase 5
+    # ── Apps (Phase 5) ──────────────────────────────────────────────────
+    "apps/d365-automate-tui",
+    "apps/d365-automate-gw",
+    "apps/d365-automate-ingest",
+    "apps/d365-automate-bench",
+    "apps/sample-server",
+    "apps/sample-client",
+    # ── Web UI (Phase 6), deploy/CI (Phase 7), skills/docs (Phase 8) — see PORTING.md
 ]
 
 [workspace.package]
-version = "0.4.0"
+version = "0.5.0"
 edition = "2021"
 rust-version = "1.80"
 license = "Apache-2.0"

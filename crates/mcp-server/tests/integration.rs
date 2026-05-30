@@ -126,7 +126,6 @@ async fn elicitation_round_trip() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn elicitation_declined_returns_decline_action() {
-    use mcp_core::{ElicitationAction, ElicitationParams, ElicitationResult};
     use mcp_server::{registry::ToolFn, elicit, ExposurePolicy};
 
     let server = Server::builder("test-server", "0.1.0")

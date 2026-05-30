@@ -120,7 +120,7 @@ mod tests {
         assert!(report.chunks >= 2);
 
         // Search by intent: query embedded to vector, store returns the right page.
-        let q_vec = embedder.embed(&vec!["period close GeneralJournalAccountEntry reconciliation".to_string()]).await.unwrap();
+        let q_vec = embedder.embed(&["period close GeneralJournalAccountEntry reconciliation".to_string()]).await.unwrap();
         let hits = store.search(
             SearchQuery::text("period close GeneralJournalAccountEntry reconciliation", 5)
                 .with_embedding(q_vec[0].clone())

@@ -1,0 +1,21 @@
+[package]
+name = "d365-automate-ingest-bin"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "D365-Automate ingestion CLI (Phase 1A)."
+
+[[bin]]
+name = "d365-automate-ingest"
+path = "src/main.rs"
+
+[dependencies]
+d365-automate-kb = { workspace = true, features = ["qdrant"] }
+d365-automate-ingest = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+anyhow = { workspace = true }
+clap = { workspace = true }

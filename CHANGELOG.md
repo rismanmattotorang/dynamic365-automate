@@ -10,6 +10,34 @@ GaussianTech. See [`PORTING.md`](PORTING.md) for the phased strategy.
 
 ---
 
+## [0.5.0] — 2026-05-30 · Apps (Phase 5)
+
+Ports the remaining binaries and re-grounds their demo content in Dynamics 365.
+
+### Added — apps
+
+- `d365-automate-tui` — Ratatui operator console (live latency budget, service
+  metadata cache panel, synthetic traffic re-grounded to the D365 tool surface).
+- `d365-automate-gw` — multi-channel gateway: spawns `d365-automate-server`,
+  routes channel-initiated queries to MCP tools/skills via a keyword router
+  (`match_skill` re-grounded to D365 skills), 4-tier memory, scheduler driver.
+- `d365-automate-ingest` (bin `d365-automate-ingest`) — crawl/chunk/embed/upsert
+  CLI over `LearnCrawler` (Memory or Qdrant backend, Mock or OpenAI embedder).
+- `d365-automate-bench` — acceptance harness; D365 RAG + graph workloads and the
+  `./docs/sample-learn-corpus`.
+- `sample-server` / `sample-client` — protocol smoke-test binaries; the client
+  spawns `d365-automate-server` by default.
+
+### Verified
+
+- All six binaries build; `cargo clippy --all-targets` — no warnings.
+- `d365-automate-bench --graph` passes both gates (RAG P95 0.074 ms ≤ 80 ms;
+  graph multi-hop P95 0.084 ms ≤ 400 ms) against the seeded Learn corpus.
+- `sample-client` drives the server and lists the D365 tool surface.
+- `cargo test --all-features` — **137 passing**.
+
+---
+
 ## [0.4.0] — 2026-05-30 · MCP server (Phase 4)
 
 Wires the backend tier into a runnable MCP server: `apps/d365-automate-server`.

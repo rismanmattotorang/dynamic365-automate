@@ -37,7 +37,7 @@
 | 2 | ERP-agnostic engines + agentic layer (`kb`/`rag`/`graph`/`ingest`/`memory`/`scheduler`/`channels`/`skills`/`observability`/`connectors`) | ✅ Done — 86 tests passing |
 | 3 | Dynamics 365 backend tier (`d365-automate-odata`, `d365-automate-meta`) | ✅ Done — 130 tests passing (live HTTP transports → 3b) |
 | 4 | MCP server: tools / resources / prompts / seed | ✅ Done — 137 tests passing; binary serves stdio + HTTP |
-| 5 | Apps (TUI, gateway, ingest, bench, samples) | ⏳ Planned |
+| 5 | Apps (TUI, gateway, ingest, bench, samples) | ✅ Done — all six binaries build & run; bench passes acceptance gates |
 | 6 | Web UI (Next.js) | ⏳ Planned |
 | 7 | Deploy & CI | ⏳ Planned |
 | 8 | Skills & docs | ⏳ Planned |

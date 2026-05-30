@@ -186,7 +186,7 @@ mod tests {
         // PPR should surface the period_close concept and the account-entry entity.
         assert!(ids.iter().any(|id| *id == "concept:period_close" || *id == "ent:GeneralJournalAccountEntry"));
         // It should also reach the FIN-CORE solution via GeneralJournalAccountEntry.
-        assert!(ids.iter().any(|id| *id == "sol:FIN-CORE"),
+        assert!(ids.contains(&"sol:FIN-CORE"),
             "PPR should cross from period_close → GeneralJournalAccountEntry → FIN-CORE; got {ids:?}");
     }
 
@@ -194,7 +194,7 @@ mod tests {
     fn ppr_respects_max_hops() {
         let g = InMemoryGraph::with_demo_corpus();
         let cfg = PprConfig { max_hops: 1, ..PprConfig::default() };
-        let r = multi_hop_search(&g, "ZIF_FIN_POSTABLE", 1, &cfg, 50);
+        let r = multi_hop_search(&g, "GTFinPostable", 1, &cfg, 50);
         for h in &r.ranked {
             assert!(h.hops <= 1, "hop budget violated: {} at {} hops", h.id, h.hops);
         }
