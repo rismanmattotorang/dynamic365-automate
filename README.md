@@ -40,7 +40,7 @@
 | 5 | Apps (TUI, gateway, ingest, bench, samples) | ✅ Done — all six binaries build & run; bench passes acceptance gates |
 | 6 | Web UI (Next.js) | ✅ Done — `next build` passes (9 routes) |
 | 7 | Deploy & CI | ✅ Done — Dockerfile, k8s, Grafana, CI/release workflows |
-| 8 | Skills & docs | ⏳ Planned |
+| 8 | Skills & docs | ✅ Done — 13 D365 skills load as prompts (16 total) |
 
 See **[`PORTING.md`](PORTING.md)** for the phase-by-phase strategy, the full
 SAP→Dynamics 365 conceptual mapping, the tool crosswalk, and the correctness

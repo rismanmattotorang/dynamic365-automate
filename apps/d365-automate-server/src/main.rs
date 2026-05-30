@@ -151,7 +151,18 @@ async fn main() -> anyhow::Result<()> {
     let meta_client: Arc<dyn MetadataClient> = MockMetadataClient::new(connection);
 
     let agents_md = load_agents_md(cli.agents_md.as_deref()).await;
-    let skills = SkillRegistry::new();
+
+    // Skills auto-discovery: each ./skills/*.md becomes an MCP prompt.
+    let mut skills = SkillRegistry::new();
+    let skill_paths: Vec<std::path::PathBuf> = vec![
+        std::path::PathBuf::from("./skills"),
+        std::path::PathBuf::from("./.d365-automate/skills"),
+        dirs_config_path("d365-automate/skills"),
+    ];
+    let loaded = skills.scan_paths(&skill_paths).await.unwrap_or(0);
+    if loaded > 0 {
+        tracing::info!(skills = loaded, "loaded agentic skills");
+    }
 
     let ctx = Arc::new(ServerContext {
         rag,
@@ -249,6 +260,15 @@ fn build_server(
     for desc in prompts::all(skills) { builder = builder.prompt(desc); }
     builder = register_completers(builder);
     builder.build()
+}
+
+/// Resolve `~/.config/<suffix>` (falling back to the bare suffix).
+fn dirs_config_path(suffix: &str) -> std::path::PathBuf {
+    if let Some(home) = std::env::var_os("HOME") {
+        std::path::PathBuf::from(home).join(".config").join(suffix)
+    } else {
+        std::path::PathBuf::from(suffix)
+    }
 }
 
 /// Load AGENTS.md from an explicit path or `./AGENTS.md` if present.

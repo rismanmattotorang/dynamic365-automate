@@ -10,6 +10,36 @@ GaussianTech. See [`PORTING.md`](PORTING.md) for the phased strategy.
 
 ---
 
+## [0.8.0] — 2026-05-30 · Skills & docs (Phase 8)
+
+Rewrites the 13 agentic skills for Dynamics 365 and ports the docs.
+
+### Added — `skills/` (13 markdown skills, each an MCP prompt)
+
+- `period-close-investigation` (ledger close), `xpp-code-review`,
+  `extension-audit` (over-layering vs extensions), `package-deploy-elicit`,
+  `data-entity-design`, `deploy-impact-analysis`, `synapse-link-migration`
+  (analytics → Synapse Link / Fabric), `custom-service-scaffolding`,
+  `security-sod-audit`, `po-creation-elicit`, `customer-master-elicit`,
+  `aipnv-ai-pairing`, `karpathy-guidelines`. All named `d365.skill.*` and wired
+  to the D365 tool surface (`d365.*`, `xpp.meta.*`, `kb.*`).
+- `apps/d365-automate-server/src/main.rs` now scans `./skills`,
+  `./.d365-automate/skills`, and `~/.config/d365-automate/skills`, exposing each
+  as an MCP prompt.
+
+### Added — `docs/`
+
+- `D365_CORRECTNESS.md` (the 7 invariants + service/entity catalogue),
+  `INTEGRATION.md` (Entra app registration, env vars, connection file, the
+  one-site live-client swap), `ROADMAP.md`, `RUNBOOK_DEV_ENVIRONMENT.md`.
+
+### Verified
+
+- The server logs `loaded agentic skills skills=13`; `sample-client --list`
+  shows **16 prompts** (13 `d365.skill.*` + 3 built-ins).
+
+---
+
 ## [0.7.0] — 2026-05-30 · Deploy & CI (Phase 7)
 
 Ports the deployment manifests and CI/release pipelines, rebranded for

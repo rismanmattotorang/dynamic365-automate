@@ -186,10 +186,11 @@ only as they land, so the tree always compiles.
 - `.github/workflows/ci.yml` — fmt, clippy (`--all-targets`), test matrix (stable/beta), **Dynamics 365 correctness invariants** job (runs the 7 odata precision tests), bench acceptance gate (`d365-automate-bench --graph`), cargo-audit, Docker build, kubeconform, and the Next.js web build. `release.yml` — multi-arch binaries + GHCR image + GitHub Release. The Phase-3b `http` feature flags were dropped from CI (default build covers the mock path).
 - **Exit:** k8s YAML + workflows + Grafana JSON all parse; the exact Docker build command (`--bin d365-automate-server --bin d365-automate-gw`) compiles; image refs consistent. ✅ *Done — see CHANGELOG 0.7.0.*
 
-### Phase 8 — Skills & docs
-- Rewrite the 13 skills for D365 (e.g. `period-close-investigation`→D365 ledger close, `abap-code-review`→X++ code review, `clean-core-audit`→over-layering/extension audit, `transport-release-elicit`→package-deploy elicit, `odata-service-design`→D365 data-entity design).
-- Port `docs/` (ARCHITECTURE, ROADMAP, INTEGRATION, CORRECTNESS, RUNBOOK, COMPARISON).
-- **Exit:** every skill auto-loads as an MCP prompt; docs reference D365 canon.
+### ✅ Phase 8 — Skills & docs *(done)*
+- Rewrote the 13 skills for Dynamics 365 (`skills/*.md`): `period_close_investigation` (ledger close), `xpp_code_review` (was abap-code-review), `extension_audit` (was clean-core-audit — over-layering vs extensions), `package_deploy_elicit` (was transport-release-elicit), `data_entity_design` (was odata-service-design), `deploy_impact_analysis` (was transport-impact-analysis), `synapse_link_migration` (was bw-to-datasphere), `custom_service_scaffolding` (was rap-service-scaffolding), `security_sod_audit`, `po_creation_elicit`, `customer_master_elicit`, `aipnv_ai_pairing`, `karpathy_guidelines` — all named `d365.skill.*` and wired to the D365 tool surface.
+- Wired `main.rs` to scan `./skills` (+ `./.d365-automate/skills`, `~/.config/d365-automate/skills`) so each becomes an MCP prompt.
+- Ported the docs: `docs/D365_CORRECTNESS.md`, `docs/INTEGRATION.md`, `docs/ROADMAP.md`, `docs/RUNBOOK_DEV_ENVIRONMENT.md`.
+- **Exit:** the server loads **13 skills** → `prompts/list` shows **16 prompts** (13 skills + 3 built-ins), verified via `sample-client --list`. ✅ *Done — see CHANGELOG 0.8.0.*
 
 ---
 
