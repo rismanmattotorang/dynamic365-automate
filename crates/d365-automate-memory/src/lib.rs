@@ -24,7 +24,12 @@ use thiserror::Error;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub enum Tier { Working, Episodic, Semantic, Procedural }
+pub enum Tier {
+    Working,
+    Episodic,
+    Semantic,
+    Procedural,
+}
 
 #[derive(Debug, Error)]
 pub enum MemoryError {
@@ -52,23 +57,32 @@ pub struct MemoryEntry {
 impl MemoryEntry {
     pub fn new(tier: Tier, key: impl Into<String>, value: serde_json::Value) -> Self {
         Self {
-            tier, key: key.into(), value,
+            tier,
+            key: key.into(),
+            value,
             trust_class: default_trust(),
             tenant: None,
             created_at_ms: now_ms(),
         }
     }
     pub fn with_trust(mut self, trust: &str) -> Self {
-        self.trust_class = trust.into(); self
+        self.trust_class = trust.into();
+        self
     }
     pub fn with_tenant(mut self, tenant: impl Into<String>) -> Self {
-        self.tenant = Some(tenant.into()); self
+        self.tenant = Some(tenant.into());
+        self
     }
 }
 
-fn default_trust() -> String { "unverified".into() }
+fn default_trust() -> String {
+    "unverified".into()
+}
 fn now_ms() -> u64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0)
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
 }
 
 // ---------------------------------------------------------------------------
@@ -84,15 +98,22 @@ pub struct WorkingMemory {
 }
 
 impl WorkingMemory {
-    pub fn new() -> Self { Self::with_capacity(DEFAULT_WORKING_CAP) }
+    pub fn new() -> Self {
+        Self::with_capacity(DEFAULT_WORKING_CAP)
+    }
     pub fn with_capacity(cap: usize) -> Self {
-        Self { sessions: RwLock::new(HashMap::new()), cap: cap.max(1) }
+        Self {
+            sessions: RwLock::new(HashMap::new()),
+            cap: cap.max(1),
+        }
     }
 
     pub fn append(&self, session_id: &str, entry: MemoryEntry) {
         let mut s = self.sessions.write().unwrap();
         let q = s.entry(session_id.into()).or_default();
-        if q.len() == self.cap { q.pop_front(); }
+        if q.len() == self.cap {
+            q.pop_front();
+        }
         q.push_back(entry);
     }
 
@@ -109,7 +130,9 @@ impl WorkingMemory {
         self.sessions.write().unwrap().remove(session_id);
     }
 
-    pub fn session_count(&self) -> usize { self.sessions.read().unwrap().len() }
+    pub fn session_count(&self) -> usize {
+        self.sessions.read().unwrap().len()
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -126,7 +149,9 @@ pub struct EpisodicMemory {
 }
 
 impl EpisodicMemory {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     /// Append a new episode with optional tags.  Returns the new entry
     /// index for later retrieval.
@@ -152,12 +177,14 @@ impl EpisodicMemory {
             by_tag.get(tag).cloned().unwrap_or_default()
         };
         let entries = self.entries.read().unwrap();
-        let mut out: Vec<MemoryEntry> = idxs.into_iter().rev()
+        let mut out: Vec<MemoryEntry> = idxs
+            .into_iter()
+            .rev()
             .filter_map(|i| entries.get(i))
             .filter(|e| match (tenant, &e.tenant) {
                 (Some(t), Some(et)) => t == et,
-                (Some(_), None) => true,    // public entries readable everywhere
-                (None, _) => true,           // no tenant filter
+                (Some(_), None) => true, // public entries readable everywhere
+                (None, _) => true,       // no tenant filter
             })
             .take(limit)
             .cloned()
@@ -166,7 +193,9 @@ impl EpisodicMemory {
         out
     }
 
-    pub fn total(&self) -> usize { self.entries.read().unwrap().len() }
+    pub fn total(&self) -> usize {
+        self.entries.read().unwrap().len()
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -183,7 +212,9 @@ pub struct MemoryManager {
 }
 
 impl Default for MemoryManager {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl MemoryManager {
@@ -197,7 +228,12 @@ impl MemoryManager {
     /// Assemble per-tier context for a session.  Returns a flat list
     /// preserving the gradient order so the agent's prompt-builder can
     /// concatenate it as-is.
-    pub fn assemble(&self, session_id: &str, tag: Option<&str>, tenant: Option<&str>) -> Vec<MemoryEntry> {
+    pub fn assemble(
+        &self,
+        session_id: &str,
+        tag: Option<&str>,
+        tenant: Option<&str>,
+    ) -> Vec<MemoryEntry> {
         let mut out = Vec::new();
         out.extend(self.working.recent(session_id, 8));
         if let Some(tag) = tag {
@@ -215,7 +251,10 @@ mod tests {
     fn working_memory_ring_buffer_evicts_oldest() {
         let m = WorkingMemory::with_capacity(2);
         for i in 0..3 {
-            m.append("S1", MemoryEntry::new(Tier::Working, format!("k{i}"), serde_json::json!(i)));
+            m.append(
+                "S1",
+                MemoryEntry::new(Tier::Working, format!("k{i}"), serde_json::json!(i)),
+            );
         }
         let r = m.recent("S1", 10);
         assert_eq!(r.len(), 2);
@@ -226,9 +265,32 @@ mod tests {
     #[test]
     fn episodic_tag_filter_with_tenant() {
         let m = EpisodicMemory::new();
-        m.record(MemoryEntry::new(Tier::Episodic, "po1", serde_json::json!({"po": "4500001234"})).with_tenant("T1"), &["po", "fi"]);
-        m.record(MemoryEntry::new(Tier::Episodic, "po2", serde_json::json!({"po": "4500001235"})).with_tenant("T2"), &["po"]);
-        m.record(MemoryEntry::new(Tier::Episodic, "public", serde_json::json!({"note": "shared"})), &["po"]);
+        m.record(
+            MemoryEntry::new(
+                Tier::Episodic,
+                "po1",
+                serde_json::json!({"po": "4500001234"}),
+            )
+            .with_tenant("T1"),
+            &["po", "fi"],
+        );
+        m.record(
+            MemoryEntry::new(
+                Tier::Episodic,
+                "po2",
+                serde_json::json!({"po": "4500001235"}),
+            )
+            .with_tenant("T2"),
+            &["po"],
+        );
+        m.record(
+            MemoryEntry::new(
+                Tier::Episodic,
+                "public",
+                serde_json::json!({"note": "shared"}),
+            ),
+            &["po"],
+        );
         let t1 = m.by_tag("po", Some("T1"), 10);
         assert_eq!(t1.len(), 2, "T1 sees its own + public");
         let t2 = m.by_tag("po", Some("T2"), 10);
@@ -239,8 +301,18 @@ mod tests {
     #[test]
     fn manager_assembles_in_gradient_order() {
         let mm = MemoryManager::new();
-        mm.working.append("S1", MemoryEntry::new(Tier::Working, "user_intent", serde_json::json!("FI close")));
-        mm.episodic.record(MemoryEntry::new(Tier::Episodic, "last_close", serde_json::json!("M02 closed 2026-03-02")), &["fi"]);
+        mm.working.append(
+            "S1",
+            MemoryEntry::new(Tier::Working, "user_intent", serde_json::json!("FI close")),
+        );
+        mm.episodic.record(
+            MemoryEntry::new(
+                Tier::Episodic,
+                "last_close",
+                serde_json::json!("M02 closed 2026-03-02"),
+            ),
+            &["fi"],
+        );
         let ctx = mm.assemble("S1", Some("fi"), None);
         assert_eq!(ctx.len(), 2);
         assert!(matches!(ctx[0].tier, Tier::Working));

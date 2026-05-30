@@ -75,7 +75,9 @@ impl RateLimiter {
     /// Inspect (without mutating) the per-host interval.
     pub fn interval_of(&self, host: &str) -> Duration {
         let s = self.state.lock().unwrap();
-        s.get(host).map(|b| b.interval).unwrap_or(self.default_interval)
+        s.get(host)
+            .map(|b| b.interval)
+            .unwrap_or(self.default_interval)
     }
 }
 
@@ -121,9 +123,15 @@ mod tests {
         // by the new (50ms) interval, not the old 200ms.
         let w1 = rl.acquire_wait("a");
         let w2 = rl.acquire_wait("a");
-        assert_eq!(w1, Duration::ZERO, "drained bucket, first call should be free");
-        assert!(w2 >= Duration::from_millis(40) && w2 <= Duration::from_millis(70),
-            "expected ~50ms spacing under new interval; got {w2:?}");
+        assert_eq!(
+            w1,
+            Duration::ZERO,
+            "drained bucket, first call should be free"
+        );
+        assert!(
+            w2 >= Duration::from_millis(40) && w2 <= Duration::from_millis(70),
+            "expected ~50ms spacing under new interval; got {w2:?}"
+        );
     }
 
     #[test]

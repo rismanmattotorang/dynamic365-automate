@@ -36,7 +36,10 @@ pub struct Credentials {
 impl Credentials {
     /// Authority URL for the OAuth2 token endpoint.
     pub fn token_endpoint(&self) -> String {
-        format!("https://login.microsoftonline.com/{}/oauth2/v2.0/token", self.tenant_id)
+        format!(
+            "https://login.microsoftonline.com/{}/oauth2/v2.0/token",
+            self.tenant_id
+        )
     }
 
     /// Redacted summary safe for logs and the `d365-env://info` resource.
@@ -76,23 +79,40 @@ pub trait CredentialProvider: Send + Sync {
 pub struct EnvCredentialProvider;
 
 impl EnvCredentialProvider {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 }
 
 impl Default for EnvCredentialProvider {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[async_trait]
 impl CredentialProvider for EnvCredentialProvider {
     async fn fetch(&self) -> D365Result<Option<Credentials>> {
-        let needed = ["D365_RESOURCE", "D365_TENANT_ID", "D365_CLIENT_ID", "D365_CLIENT_SECRET"];
-        let present: Vec<_> = needed.iter().filter(|k| std::env::var(*k).is_ok()).collect();
-        if present.is_empty() { return Ok(None); }
+        let needed = [
+            "D365_RESOURCE",
+            "D365_TENANT_ID",
+            "D365_CLIENT_ID",
+            "D365_CLIENT_SECRET",
+        ];
+        let present: Vec<_> = needed
+            .iter()
+            .filter(|k| std::env::var(*k).is_ok())
+            .collect();
+        if present.is_empty() {
+            return Ok(None);
+        }
         if present.len() < needed.len() {
             return Err(D365Error::AuthFailed(format!(
                 "partial Dynamics 365 env vars: missing {:?}",
-                needed.iter().filter(|k| std::env::var(*k).is_err()).collect::<Vec<_>>(),
+                needed
+                    .iter()
+                    .filter(|k| std::env::var(*k).is_err())
+                    .collect::<Vec<_>>(),
             )));
         }
         Ok(Some(Credentials {
@@ -115,7 +135,9 @@ pub struct StaticCredentialProvider {
 }
 
 impl StaticCredentialProvider {
-    pub fn new(creds: Credentials) -> Self { Self { creds } }
+    pub fn new(creds: Credentials) -> Self {
+        Self { creds }
+    }
 }
 
 #[async_trait]
@@ -136,7 +158,11 @@ pub struct LayeredCredentialProvider {
 }
 
 impl LayeredCredentialProvider {
-    pub fn new() -> Self { Self { providers: Vec::new() } }
+    pub fn new() -> Self {
+        Self {
+            providers: Vec::new(),
+        }
+    }
 
     #[allow(clippy::should_implement_trait)]
     pub fn add(mut self, p: Arc<dyn CredentialProvider>) -> Self {
@@ -146,7 +172,9 @@ impl LayeredCredentialProvider {
 }
 
 impl Default for LayeredCredentialProvider {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[async_trait]
@@ -180,7 +208,10 @@ mod tests {
 
     #[tokio::test]
     async fn static_provider_returns_credentials() {
-        let p = StaticCredentialProvider::new(creds(CredentialSource::Static, "https://gt.operations.dynamics.com"));
+        let p = StaticCredentialProvider::new(creds(
+            CredentialSource::Static,
+            "https://gt.operations.dynamics.com",
+        ));
         let c = p.fetch().await.unwrap().unwrap();
         assert_eq!(c.legal_entity, "USMF");
         let r = c.redacted();
@@ -192,7 +223,10 @@ mod tests {
     async fn layered_falls_through() {
         let layered = LayeredCredentialProvider::new()
             .add(Arc::new(EnvCredentialProvider::new())) // unset env => None
-            .add(Arc::new(StaticCredentialProvider::new(creds(CredentialSource::Static, "https://fallback.operations.dynamics.com"))));
+            .add(Arc::new(StaticCredentialProvider::new(creds(
+                CredentialSource::Static,
+                "https://fallback.operations.dynamics.com",
+            ))));
         let c = layered.fetch().await.unwrap().unwrap();
         assert_eq!(c.resource, "https://fallback.operations.dynamics.com");
     }

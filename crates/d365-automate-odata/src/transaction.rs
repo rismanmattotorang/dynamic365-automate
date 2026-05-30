@@ -90,7 +90,13 @@ pub async fn execute_write_operation(
 
     if has_failure(&messages) {
         // The server rejected the change set; nothing persisted.
-        return Ok(WriteOutcome { operation, committed: false, rolled_back: true, messages, result });
+        return Ok(WriteOutcome {
+            operation,
+            committed: false,
+            rolled_back: true,
+            messages,
+            result,
+        });
     }
 
     // FAIL-CLOSED: no positive confirmation (empty Infolog) → do not report a
@@ -100,25 +106,43 @@ pub async fn execute_write_operation(
             InfologSeverity::Warning,
             "operation returned no Infolog; outcome unconfirmed — not committed",
         )];
-        return Ok(WriteOutcome { operation, committed: false, rolled_back: true, messages: out, result });
+        return Ok(WriteOutcome {
+            operation,
+            committed: false,
+            rolled_back: true,
+            messages: out,
+            result,
+        });
     }
 
     // Non-empty and no failure → the change set committed atomically.
-    Ok(WriteOutcome { operation, committed: true, rolled_back: false, messages, result })
+    Ok(WriteOutcome {
+        operation,
+        committed: true,
+        rolled_back: false,
+        messages,
+        result,
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::client::{
-        BulkMetadata, EntityStructure, EnvironmentInfo, MockD365Client, ReadEntityRequest,
-        EntityRow, ServiceOperationMeta, ServiceSearchResult,
+        BulkMetadata, EntityRow, EntityStructure, EnvironmentInfo, MockD365Client,
+        ReadEntityRequest, ServiceOperationMeta, ServiceSearchResult,
     };
     use async_trait::async_trait;
     use serde_json::json;
 
     fn msg(sev: InfologSeverity) -> InfologMessage {
-        InfologMessage { severity: sev, code: "X".into(), text: "t".into(), field: None, environment: None }
+        InfologMessage {
+            severity: sev,
+            code: "X".into(),
+            text: "t".into(),
+            field: None,
+            environment: None,
+        }
     }
 
     #[test]
@@ -126,7 +150,10 @@ mod tests {
         assert!(has_failure(&[msg(InfologSeverity::Error)]));
         assert!(has_failure(&[msg(InfologSeverity::Unknown('Z'))]));
         assert!(!has_failure(&[msg(InfologSeverity::Success)]));
-        assert!(!has_failure(&[msg(InfologSeverity::Warning), msg(InfologSeverity::Info)]));
+        assert!(!has_failure(&[
+            msg(InfologSeverity::Warning),
+            msg(InfologSeverity::Info)
+        ]));
         assert!(!has_failure(&[]));
     }
 
@@ -139,7 +166,9 @@ mod tests {
             timeout_ms: 1000,
             require_read_only_safe: true,
         };
-        let err = execute_write_operation(client.as_ref(), req, true).await.unwrap_err();
+        let err = execute_write_operation(client.as_ref(), req, true)
+            .await
+            .unwrap_err();
         assert!(matches!(err, D365Error::PermissionDenied(_)), "got {err:?}");
     }
 
@@ -152,8 +181,13 @@ mod tests {
             timeout_ms: 1000,
             require_read_only_safe: false,
         };
-        let err = execute_write_operation(client.as_ref(), req, false).await.unwrap_err();
-        assert!(matches!(err, D365Error::InvalidParameter { .. }), "got {err:?}");
+        let err = execute_write_operation(client.as_ref(), req, false)
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(err, D365Error::InvalidParameter { .. }),
+            "got {err:?}"
+        );
     }
 
     #[tokio::test]
@@ -167,14 +201,21 @@ mod tests {
             timeout_ms: 1000,
             require_read_only_safe: true,
         };
-        let outcome = execute_write_operation(client.as_ref(), req, false).await.unwrap();
+        let outcome = execute_write_operation(client.as_ref(), req, false)
+            .await
+            .unwrap();
         assert!(!outcome.committed, "empty Infolog must not commit");
         assert!(outcome.rolled_back);
-        assert!(outcome.messages.iter().any(|m| m.text.contains("unconfirmed")));
+        assert!(outcome
+            .messages
+            .iter()
+            .any(|m| m.text.contains("unconfirmed")));
     }
 
     // A scripted client returning a canned Infolog for the business operation.
-    struct ScriptedClient { infolog: Value }
+    struct ScriptedClient {
+        infolog: Value,
+    }
 
     #[async_trait]
     impl D365Client for ScriptedClient {
@@ -201,11 +242,15 @@ mod tests {
         }
     }
 
-    fn scripted(infolog: Value) -> ScriptedClient { ScriptedClient { infolog } }
+    fn scripted(infolog: Value) -> ScriptedClient {
+        ScriptedClient { infolog }
+    }
 
     #[tokio::test]
     async fn commits_on_explicit_success_row() {
-        let client = scripted(json!([{ "severity": "Info", "code": "PurchPosted", "message": "Purchase order PO-000178 created" }]));
+        let client = scripted(
+            json!([{ "severity": "Info", "code": "PurchPosted", "message": "Purchase order PO-000178 created" }]),
+        );
         let req = ServiceCallRequest {
             operation: "PurchaseOrderCreate".into(),
             parameters: json!({ "OrderAccount": "V-001" }),
@@ -213,13 +258,19 @@ mod tests {
             require_read_only_safe: true,
         };
         let outcome = execute_write_operation(&client, req, false).await.unwrap();
-        assert!(outcome.committed, "expected commit; messages={:?}", outcome.messages);
+        assert!(
+            outcome.committed,
+            "expected commit; messages={:?}",
+            outcome.messages
+        );
         assert!(!outcome.rolled_back);
     }
 
     #[tokio::test]
     async fn rolls_back_on_error_row() {
-        let client = scripted(json!([{ "severity": "Error", "code": "VendBlocked", "message": "Vendor V-001 is on hold" }]));
+        let client = scripted(
+            json!([{ "severity": "Error", "code": "VendBlocked", "message": "Vendor V-001 is on hold" }]),
+        );
         let req = ServiceCallRequest {
             operation: "PurchaseOrderCreate".into(),
             parameters: json!({ "OrderAccount": "V-001" }),
@@ -228,6 +279,9 @@ mod tests {
         };
         let outcome = execute_write_operation(&client, req, false).await.unwrap();
         assert!(!outcome.committed, "error row must not commit");
-        assert!(outcome.rolled_back, "error row must roll back the change set");
+        assert!(
+            outcome.rolled_back,
+            "error row must roll back the change set"
+        );
     }
 }

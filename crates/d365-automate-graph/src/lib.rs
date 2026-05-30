@@ -22,8 +22,8 @@ pub mod ppr;
 pub mod raptor;
 pub mod store;
 
-pub use community::{Communities, Community, detect_communities};
+pub use community::{detect_communities, Communities, Community};
 pub use entity::{Edge, EdgeKind, Entity, EntityKind, NodeId};
-pub use ppr::{personalised_pagerank, PprConfig, PprResult, multi_hop_search};
-pub use raptor::{RaptorTree, RaptorLevel, RaptorNode, build_raptor_tree};
-pub use store::{InMemoryGraph, GraphStats};
+pub use ppr::{multi_hop_search, personalised_pagerank, PprConfig, PprResult};
+pub use raptor::{build_raptor_tree, RaptorLevel, RaptorNode, RaptorTree};
+pub use store::{GraphStats, InMemoryGraph};

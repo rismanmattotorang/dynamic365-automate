@@ -39,7 +39,9 @@ pub enum D365ErrorCode {
 }
 
 impl D365ErrorCode {
-    pub fn as_i32(self) -> i32 { self as i32 }
+    pub fn as_i32(self) -> i32 {
+        self as i32
+    }
 
     /// Whether the caller should retry after backoff.
     pub fn is_transient(self) -> bool {
@@ -108,7 +110,9 @@ impl D365Error {
         }
     }
 
-    pub fn is_transient(&self) -> bool { self.code().is_transient() }
+    pub fn is_transient(&self) -> bool {
+        self.code().is_transient()
+    }
 }
 
 #[cfg(test)]
@@ -118,18 +122,24 @@ mod tests {
     #[test]
     fn transient_classification_only_matches_transient_range() {
         for c in [
-            D365ErrorCode::Timeout, D365ErrorCode::EnvironmentDown,
-            D365ErrorCode::PoolExhausted, D365ErrorCode::CircuitOpen,
+            D365ErrorCode::Timeout,
+            D365ErrorCode::EnvironmentDown,
+            D365ErrorCode::PoolExhausted,
+            D365ErrorCode::CircuitOpen,
             D365ErrorCode::UpstreamRateLimit,
         ] {
             assert!(c.is_transient(), "{c:?} should be transient");
         }
         for c in [
-            D365ErrorCode::AuthFailed, D365ErrorCode::NotFound,
-            D365ErrorCode::QueryResultOverflow, D365ErrorCode::InvalidParameter,
-            D365ErrorCode::PermissionDenied, D365ErrorCode::SchemaViolation,
+            D365ErrorCode::AuthFailed,
+            D365ErrorCode::NotFound,
+            D365ErrorCode::QueryResultOverflow,
+            D365ErrorCode::InvalidParameter,
+            D365ErrorCode::PermissionDenied,
+            D365ErrorCode::SchemaViolation,
             D365ErrorCode::Internal,
-            D365ErrorCode::PartialBulk, D365ErrorCode::StaleMetadata,
+            D365ErrorCode::PartialBulk,
+            D365ErrorCode::StaleMetadata,
         ] {
             assert!(!c.is_transient(), "{c:?} should NOT be transient");
         }

@@ -8,8 +8,7 @@
 
 use clap::{Parser, ValueEnum};
 use d365_automate_ingest::{
-    LearnCrawler, IngestionPipeline, MockEmbedder, OpenAiEmbedder,
-    EmbeddingClient,
+    EmbeddingClient, IngestionPipeline, LearnCrawler, MockEmbedder, OpenAiEmbedder,
 };
 use d365_automate_kb::{InMemoryKb, KnowledgeStore, SearchQuery};
 use std::sync::Arc;
@@ -77,7 +76,9 @@ struct Cli {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
+        .with_env_filter(
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
+        )
         .init();
 
     let cli = Cli::parse();
@@ -85,9 +86,19 @@ async fn main() -> anyhow::Result<()> {
     let embedder: Arc<dyn EmbeddingClient> = match cli.embedder {
         Embedder::Mock => Arc::new(MockEmbedder::new(cli.embedding_dim)),
         Embedder::Openai => {
-            let key = cli.openai_api_key.clone().or_else(|| std::env::var("OPENAI_API_KEY").ok())
-                .ok_or_else(|| anyhow::anyhow!("openai embedder requires --openai-api-key or $OPENAI_API_KEY"))?;
-            Arc::new(OpenAiEmbedder::new(cli.openai_base_url.clone(), key, cli.openai_model.clone(), cli.embedding_dim))
+            let key = cli
+                .openai_api_key
+                .clone()
+                .or_else(|| std::env::var("OPENAI_API_KEY").ok())
+                .ok_or_else(|| {
+                    anyhow::anyhow!("openai embedder requires --openai-api-key or $OPENAI_API_KEY")
+                })?;
+            Arc::new(OpenAiEmbedder::new(
+                cli.openai_base_url.clone(),
+                key,
+                cli.openai_model.clone(),
+                cli.embedding_dim,
+            ))
         }
     };
 
@@ -107,16 +118,30 @@ async fn main() -> anyhow::Result<()> {
 
     let crawler = LearnCrawler::new();
     let documents = crawler.crawl_directory(&cli.input_dir).await?;
-    println!("→ Crawled {} document(s) from {}", documents.len(), cli.input_dir);
+    println!(
+        "→ Crawled {} document(s) from {}",
+        documents.len(),
+        cli.input_dir
+    );
 
     let pipeline = IngestionPipeline::new(Arc::clone(&embedder), Arc::clone(&store));
     let report = pipeline.ingest(documents).await?;
-    println!("→ Ingested {} document(s), {} chunk(s)", report.documents, report.chunks);
+    println!(
+        "→ Ingested {} document(s), {} chunk(s)",
+        report.documents, report.chunks
+    );
     println!("→ KB now holds {} chunk(s)", store.chunk_count().await?);
 
     if let Some(query) = cli.verify_query.as_deref() {
-        let q_vec = embedder.embed(&[query.to_string()]).await?.into_iter().next().unwrap();
-        let hits = store.search(SearchQuery::text(query, 5).with_embedding(q_vec)).await?;
+        let q_vec = embedder
+            .embed(&[query.to_string()])
+            .await?
+            .into_iter()
+            .next()
+            .unwrap();
+        let hits = store
+            .search(SearchQuery::text(query, 5).with_embedding(q_vec))
+            .await?;
         println!("\n== verify_query = {query:?} ({} hit(s))", hits.len());
         for h in hits {
             println!(
@@ -132,8 +157,9 @@ async fn main() -> anyhow::Result<()> {
 }
 
 fn truncate(s: &str, n: usize) -> String {
-    if s.chars().count() <= n { s.to_string() }
-    else {
+    if s.chars().count() <= n {
+        s.to_string()
+    } else {
         let mut out: String = s.chars().take(n).collect();
         out.push('…');
         out

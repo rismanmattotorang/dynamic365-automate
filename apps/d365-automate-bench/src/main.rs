@@ -7,14 +7,17 @@
 
 use clap::Parser;
 use d365_automate_graph::InMemoryGraph;
-use d365_automate_ingest::{EmbeddingClient, LearnCrawler, IngestionPipeline, MockEmbedder};
+use d365_automate_ingest::{EmbeddingClient, IngestionPipeline, LearnCrawler, MockEmbedder};
 use d365_automate_kb::{InMemoryKb, KnowledgeStore};
 use d365_automate_rag::{GraphEngine, MockReranker, Query, RagEngine};
 use std::sync::Arc;
 use std::time::Instant;
 
 #[derive(Parser)]
-#[command(name = "d365-automate-bench", about = "Phase 3 acceptance harness: P95 retrieval < 80 ms")]
+#[command(
+    name = "d365-automate-bench",
+    about = "Phase 3 acceptance harness: P95 retrieval < 80 ms"
+)]
 struct Cli {
     /// Directory of *.html files to ingest.
     #[arg(long, default_value = "./docs/sample-learn-corpus")]
@@ -57,7 +60,10 @@ struct Cli {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("warn")))
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("warn")),
+        )
         .init();
 
     let cli = Cli::parse();
@@ -71,12 +77,19 @@ async fn main() -> anyhow::Result<()> {
         chunker_cfg.contextual_enrichment = false;
     }
 
-    let pipeline = IngestionPipeline::new(Arc::clone(&embedder), Arc::clone(&store))
-        .with_chunker(chunker_cfg);
+    let pipeline =
+        IngestionPipeline::new(Arc::clone(&embedder), Arc::clone(&store)).with_chunker(chunker_cfg);
     let docs = LearnCrawler::new().crawl_directory(&cli.input_dir).await?;
-    println!("→ Ingesting {} document(s) from {}", docs.len(), cli.input_dir);
+    println!(
+        "→ Ingesting {} document(s) from {}",
+        docs.len(),
+        cli.input_dir
+    );
     let report = pipeline.ingest(docs).await?;
-    println!("→ {} document(s), {} chunk(s) indexed", report.documents, report.chunks);
+    println!(
+        "→ {} document(s), {} chunk(s) indexed",
+        report.documents, report.chunks
+    );
 
     // --- Build engine -----------------------------------------------------
     let mut engine = RagEngine::new(Arc::clone(&store));
@@ -93,14 +106,20 @@ async fn main() -> anyhow::Result<()> {
     let bench_start = Instant::now();
     for i in 0..cli.n {
         let query_text = &workload[i % workload.len()];
-        let qv = embedder.embed(std::slice::from_ref(query_text)).await?.into_iter().next();
+        let qv = embedder
+            .embed(std::slice::from_ref(query_text))
+            .await?
+            .into_iter()
+            .next();
         let t0 = Instant::now();
-        let resp = engine.hybrid_search(Query {
-            text: query_text,
-            domain: None,
-            top_k: cli.top_k,
-            embedding: qv,
-        }).await?;
+        let resp = engine
+            .hybrid_search(Query {
+                text: query_text,
+                domain: None,
+                top_k: cli.top_k,
+                embedding: qv,
+            })
+            .await?;
         samples.push(t0.elapsed().as_micros() as u64);
         layer_samples.push(resp.latency.clone());
     }
@@ -116,15 +135,48 @@ async fn main() -> anyhow::Result<()> {
         layer_samples.iter().map(f).sum::<u64>() / n as u64
     };
 
-    println!("\n== Latency over {n} queries ({:.2}s wall, {:.0} q/s)",
-        wall.as_secs_f64(), n as f64 / wall.as_secs_f64());
-    println!("  Reranker:    {}", if cli.no_rerank { "off" } else { "MockReranker" });
-    println!("  Enrichment:  {}", if cli.no_contextual_enrichment { "off" } else { "on" });
-    println!("  P50 (median): {:>7} µs   ({:.3} ms)", p(0.50), p(0.50) as f64 / 1000.0);
-    println!("  P95:          {:>7} µs   ({:.3} ms)", p(0.95), p(0.95) as f64 / 1000.0);
-    println!("  P99:          {:>7} µs   ({:.3} ms)", p(0.99), p(0.99) as f64 / 1000.0);
-    println!("  Max:          {:>7} µs   ({:.3} ms)", *samples.last().unwrap(), *samples.last().unwrap() as f64 / 1000.0);
-    println!("  Mean:         {:>7} µs   ({:.3} ms)", mean, mean as f64 / 1000.0);
+    println!(
+        "\n== Latency over {n} queries ({:.2}s wall, {:.0} q/s)",
+        wall.as_secs_f64(),
+        n as f64 / wall.as_secs_f64()
+    );
+    println!(
+        "  Reranker:    {}",
+        if cli.no_rerank { "off" } else { "MockReranker" }
+    );
+    println!(
+        "  Enrichment:  {}",
+        if cli.no_contextual_enrichment {
+            "off"
+        } else {
+            "on"
+        }
+    );
+    println!(
+        "  P50 (median): {:>7} µs   ({:.3} ms)",
+        p(0.50),
+        p(0.50) as f64 / 1000.0
+    );
+    println!(
+        "  P95:          {:>7} µs   ({:.3} ms)",
+        p(0.95),
+        p(0.95) as f64 / 1000.0
+    );
+    println!(
+        "  P99:          {:>7} µs   ({:.3} ms)",
+        p(0.99),
+        p(0.99) as f64 / 1000.0
+    );
+    println!(
+        "  Max:          {:>7} µs   ({:.3} ms)",
+        *samples.last().unwrap(),
+        *samples.last().unwrap() as f64 / 1000.0
+    );
+    println!(
+        "  Mean:         {:>7} µs   ({:.3} ms)",
+        mean,
+        mean as f64 / 1000.0
+    );
     println!("\n  Layer breakdown (mean):");
     println!("    dense  : {:>5} µs", layer_mean(|l| l.dense_us));
     println!("    sparse : {:>5} µs", layer_mean(|l| l.sparse_us));
@@ -144,10 +196,14 @@ async fn main() -> anyhow::Result<()> {
     // Phase 5A graph bench (paper §X-H acceptance gate).
     // ---------------------------------------------------------------------
     if cli.graph {
-        println!("\n→ Phase 5A graph bench: HippoRAG multi-hop P95 < {} ms gate", cli.graph_gate_p95_ms);
+        println!(
+            "\n→ Phase 5A graph bench: HippoRAG multi-hop P95 < {} ms gate",
+            cli.graph_gate_p95_ms
+        );
         let kg = Arc::new(InMemoryGraph::with_demo_corpus());
         let engine = GraphEngine::new(kg);
-        println!("→ Graph: {} nodes, {} edges, {} communities",
+        println!(
+            "→ Graph: {} nodes, {} edges, {} communities",
             engine.graph.stats().node_count,
             engine.graph.stats().edge_count,
             engine.communities.communities.len(),
@@ -166,13 +222,36 @@ async fn main() -> anyhow::Result<()> {
         let gn = g_samples.len();
         let gp = |q: f64| g_samples[(((gn as f64) * q) as usize).min(gn - 1)];
         let gmean: u64 = g_samples.iter().sum::<u64>() / gn as u64;
-        println!("\n== Multi-hop latency over {gn} queries ({:.2}s wall, {:.0} q/s)",
-            g_wall.as_secs_f64(), gn as f64 / g_wall.as_secs_f64());
-        println!("  P50: {:>7} µs   ({:.3} ms)", gp(0.50), gp(0.50) as f64 / 1000.0);
-        println!("  P95: {:>7} µs   ({:.3} ms)", gp(0.95), gp(0.95) as f64 / 1000.0);
-        println!("  P99: {:>7} µs   ({:.3} ms)", gp(0.99), gp(0.99) as f64 / 1000.0);
-        println!("  Max: {:>7} µs   ({:.3} ms)", *g_samples.last().unwrap(), *g_samples.last().unwrap() as f64 / 1000.0);
-        println!("  Mean: {:>5} µs   ({:.3} ms)", gmean, gmean as f64 / 1000.0);
+        println!(
+            "\n== Multi-hop latency over {gn} queries ({:.2}s wall, {:.0} q/s)",
+            g_wall.as_secs_f64(),
+            gn as f64 / g_wall.as_secs_f64()
+        );
+        println!(
+            "  P50: {:>7} µs   ({:.3} ms)",
+            gp(0.50),
+            gp(0.50) as f64 / 1000.0
+        );
+        println!(
+            "  P95: {:>7} µs   ({:.3} ms)",
+            gp(0.95),
+            gp(0.95) as f64 / 1000.0
+        );
+        println!(
+            "  P99: {:>7} µs   ({:.3} ms)",
+            gp(0.99),
+            gp(0.99) as f64 / 1000.0
+        );
+        println!(
+            "  Max: {:>7} µs   ({:.3} ms)",
+            *g_samples.last().unwrap(),
+            *g_samples.last().unwrap() as f64 / 1000.0
+        );
+        println!(
+            "  Mean: {:>5} µs   ({:.3} ms)",
+            gmean,
+            gmean as f64 / 1000.0
+        );
         let gp95_ms = gp(0.95) as f64 / 1000.0;
         let ggate = cli.graph_gate_p95_ms as f64;
         if gp95_ms <= ggate {

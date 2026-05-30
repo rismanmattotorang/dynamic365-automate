@@ -70,7 +70,11 @@ impl ToolDescriptor {
         handler: Arc<dyn ToolHandler>,
     ) -> Self {
         Self {
-            tool: Tool { name: name.into(), description, input_schema },
+            tool: Tool {
+                name: name.into(),
+                description,
+                input_schema,
+            },
             handler,
             exposure: ToolExposure::ReadOnly,
         }

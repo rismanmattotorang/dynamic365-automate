@@ -59,10 +59,18 @@ pub struct FitStats {
 
 impl FitStats {
     pub fn block_retention(&self) -> f32 {
-        if self.blocks_in == 0 { 1.0 } else { self.blocks_out as f32 / self.blocks_in as f32 }
+        if self.blocks_in == 0 {
+            1.0
+        } else {
+            self.blocks_out as f32 / self.blocks_in as f32
+        }
     }
     pub fn char_retention(&self) -> f32 {
-        if self.chars_in == 0 { 1.0 } else { self.chars_out as f32 / self.chars_in as f32 }
+        if self.chars_in == 0 {
+            1.0
+        } else {
+            self.chars_out as f32 / self.chars_in as f32
+        }
     }
 }
 
@@ -83,7 +91,12 @@ pub fn fit_markdown_filter(body: &str, topic: &str, cfg: &FitConfig) -> (String,
     if blocks.is_empty() {
         return (
             String::new(),
-            FitStats { blocks_in: 0, blocks_out: 0, chars_in, chars_out: 0 },
+            FitStats {
+                blocks_in: 0,
+                blocks_out: 0,
+                chars_in,
+                chars_out: 0,
+            },
         );
     }
 
@@ -138,24 +151,31 @@ fn bm25_score(blocks: &[&str], query_terms: &[String], k1: f32, b: f32) -> Vec<f
         return vec![0.0; n];
     }
 
-    let df: HashMap<&String, usize> = query_terms.iter().map(|t| {
-        let c = term_counts.iter().filter(|c| c.contains_key(t)).count();
-        (t, c)
-    }).collect();
+    let df: HashMap<&String, usize> = query_terms
+        .iter()
+        .map(|t| {
+            let c = term_counts.iter().filter(|c| c.contains_key(t)).count();
+            (t, c)
+        })
+        .collect();
 
-    (0..n).map(|i| {
-        let dl = lens[i] as f32;
-        let mut score = 0.0f32;
-        for t in query_terms {
-            let f = *term_counts[i].get(t).unwrap_or(&0) as f32;
-            if f == 0.0 { continue; }
-            let df_t = *df.get(t).unwrap_or(&0) as f32;
-            let idf = ((n as f32 - df_t + 0.5) / (df_t + 0.5) + 1.0).ln();
-            let denom = f + k1 * (1.0 - b + b * dl / avg_dl);
-            score += idf * (f * (k1 + 1.0)) / denom;
-        }
-        score
-    }).collect()
+    (0..n)
+        .map(|i| {
+            let dl = lens[i] as f32;
+            let mut score = 0.0f32;
+            for t in query_terms {
+                let f = *term_counts[i].get(t).unwrap_or(&0) as f32;
+                if f == 0.0 {
+                    continue;
+                }
+                let df_t = *df.get(t).unwrap_or(&0) as f32;
+                let idf = ((n as f32 - df_t + 0.5) / (df_t + 0.5) + 1.0).ln();
+                let denom = f + k1 * (1.0 - b + b * dl / avg_dl);
+                score += idf * (f * (k1 + 1.0)) / denom;
+            }
+            score
+        })
+        .collect()
 }
 
 fn tokens(text: &str) -> Vec<String> {
@@ -165,11 +185,16 @@ fn tokens(text: &str) -> Vec<String> {
         if ch.is_alphanumeric() || ch == '_' {
             cur.push(ch.to_ascii_lowercase());
         } else if !cur.is_empty() {
-            if cur.len() >= 2 { out.push(std::mem::take(&mut cur)); }
-            else { cur.clear(); }
+            if cur.len() >= 2 {
+                out.push(std::mem::take(&mut cur));
+            } else {
+                cur.clear();
+            }
         }
     }
-    if cur.len() >= 2 { out.push(cur); }
+    if cur.len() >= 2 {
+        out.push(cur);
+    }
     out
 }
 
@@ -186,7 +211,8 @@ This page explains foreign currency revaluation for Dynamics 365 Finance. The pr
 
 Cookie banner.\n\nNext\n\nPrevious\n\nThe standard procedure operates on legal entity DataAreaId and currency type AccountingCurrency, with the resulting clearing document written through LedgerGeneralJournalEntry. Operators should verify open items via the voucher inquiry before running the revaluation, otherwise reversals get tangled.";
         let cfg = FitConfig::default();
-        let (out, stats) = fit_markdown_filter(body, "foreign currency revaluation period close", &cfg);
+        let (out, stats) =
+            fit_markdown_filter(body, "foreign currency revaluation period close", &cfg);
         // The content blocks should remain.
         assert!(out.contains("foreign currency revaluation"));
         assert!(out.contains("LedgerGeneralJournalEntry"));

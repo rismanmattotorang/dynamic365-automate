@@ -30,6 +30,12 @@ pub mod pool;
 pub mod retry;
 pub mod transaction;
 
+#[cfg(feature = "http")]
+pub mod http;
+
+#[cfg(feature = "http")]
+pub use http::{HttpD365Client, HttpD365Config};
+
 pub use client::{
     BulkMetadata, D365Client, EntityField, EntityRow, EntityStructure, EnvironmentInfo,
     MockD365Client, ParamDirection, PoolStatus, ReadEntityRequest, SecurityReference,

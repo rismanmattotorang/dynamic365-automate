@@ -25,11 +25,20 @@ pub struct D365Connection {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum D365Auth {
     /// Microsoft Entra ID OAuth2 client-credentials (the standard F&O path).
-    ClientCredentials { tenant_id: String, client_id: String, client_secret: String },
+    ClientCredentials {
+        tenant_id: String,
+        client_id: String,
+        client_secret: String,
+    },
     /// Pre-acquired bearer token.
     Bearer { token: String },
     /// Entra ID certificate credential (cert + key PEM paths).
-    Certificate { tenant_id: String, client_id: String, cert_path: String, key_path: String },
+    Certificate {
+        tenant_id: String,
+        client_id: String,
+        cert_path: String,
+        key_path: String,
+    },
     /// Mock connection — no network at all.
     Mock,
 }
@@ -82,7 +91,9 @@ mod tests {
             base_url: "https://gt-prod.operations.dynamics.com".into(),
             legal_entity: "USMF".into(),
             auth: D365Auth::ClientCredentials {
-                tenant_id: "t".into(), client_id: "c".into(), client_secret: "super-secret".into(),
+                tenant_id: "t".into(),
+                client_id: "c".into(),
+                client_secret: "super-secret".into(),
             },
         };
         let r = c.redacted();

@@ -15,19 +15,19 @@ use std::sync::RwLock;
 /// straddle the paper §X-D 80 ms gate at the 1-bucket-per-doubling
 /// resolution typical of MCP-server SLOs.
 pub const DEFAULT_BUCKETS_SECONDS: &[f64] = &[
-    0.0005,   // 0.5 ms — below the typical RAG search
-    0.001,    // 1 ms
-    0.005,    // 5 ms
-    0.010,    // 10 ms
-    0.025,    // 25 ms
-    0.050,    // 50 ms
-    0.080,    // 80 ms — the paper §X-D acceptance gate
-    0.100,    // 100 ms
-    0.250,    // 250 ms
-    0.500,    // 500 ms
-    1.0,      // 1 s
-    5.0,      // 5 s — long-running ADT scans
-    30.0,     // 30 s
+    0.0005, // 0.5 ms — below the typical RAG search
+    0.001,  // 1 ms
+    0.005,  // 5 ms
+    0.010,  // 10 ms
+    0.025,  // 25 ms
+    0.050,  // 50 ms
+    0.080,  // 80 ms — the paper §X-D acceptance gate
+    0.100,  // 100 ms
+    0.250,  // 250 ms
+    0.500,  // 500 ms
+    1.0,    // 1 s
+    5.0,    // 5 s — long-running ADT scans
+    30.0,   // 30 s
 ];
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -88,12 +88,15 @@ pub struct SeriesPoint {
 }
 
 impl MetricsRegistry {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     /// Idempotent: registering a name twice keeps the first kind/help.
     pub fn register(&self, name: &str, kind: MetricKind, help: &str) {
         let mut names = self.names.write().unwrap();
-        names.entry(name.into())
+        names
+            .entry(name.into())
             .or_insert_with(|| (kind, help.into()));
     }
 
@@ -106,8 +109,11 @@ impl MetricsRegistry {
         let mut series = self.series.write().unwrap();
         let entry = series.entry(key).or_insert_with(|| MetricState {
             kind: MetricKind::Counter,
-            scalar: 0.0, bucket_bounds: Vec::new(),
-            bucket_counts: Vec::new(), sum: 0.0, count: 0,
+            scalar: 0.0,
+            bucket_bounds: Vec::new(),
+            bucket_counts: Vec::new(),
+            sum: 0.0,
+            count: 0,
         });
         entry.scalar += by;
     }
@@ -117,8 +123,11 @@ impl MetricsRegistry {
         let mut series = self.series.write().unwrap();
         let entry = series.entry(key).or_insert_with(|| MetricState {
             kind: MetricKind::Gauge,
-            scalar: 0.0, bucket_bounds: Vec::new(),
-            bucket_counts: Vec::new(), sum: 0.0, count: 0,
+            scalar: 0.0,
+            bucket_bounds: Vec::new(),
+            bucket_counts: Vec::new(),
+            sum: 0.0,
+            count: 0,
         });
         entry.scalar = value;
     }
@@ -133,8 +142,11 @@ impl MetricsRegistry {
             let counts = vec![0u64; bounds.len() + 1]; // +1 for +Inf
             MetricState {
                 kind: MetricKind::Histogram,
-                scalar: 0.0, bucket_bounds: bounds, bucket_counts: counts,
-                sum: 0.0, count: 0,
+                scalar: 0.0,
+                bucket_bounds: bounds,
+                bucket_counts: counts,
+                sum: 0.0,
+                count: 0,
             }
         });
         entry.sum += value_seconds;
@@ -187,20 +199,32 @@ impl MetricsRegistry {
                     MetricKind::Histogram => {
                         // Emit bucket lines first, then _sum and _count.
                         let labels_prefix = if let Some(brace) = key.find('{') {
-                            &key[brace+1..key.len()-1]
-                        } else { "" };
+                            &key[brace + 1..key.len() - 1]
+                        } else {
+                            ""
+                        };
                         let base = key.split('{').next().unwrap_or(key);
                         for (i, bound) in state.bucket_bounds.iter().enumerate() {
                             let comma = if labels_prefix.is_empty() { "" } else { "," };
-                            out.push_str(&format!("{base}_bucket{{{labels_prefix}{comma}le=\"{}\"}} {}\n",
-                                format_float(*bound), state.bucket_counts[i]));
+                            out.push_str(&format!(
+                                "{base}_bucket{{{labels_prefix}{comma}le=\"{}\"}} {}\n",
+                                format_float(*bound),
+                                state.bucket_counts[i]
+                            ));
                         }
                         let comma = if labels_prefix.is_empty() { "" } else { "," };
-                        out.push_str(&format!("{base}_bucket{{{labels_prefix}{comma}le=\"+Inf\"}} {}\n",
-                            state.bucket_counts.last().copied().unwrap_or(0)));
-                        out.push_str(&format!("{base}_sum{{{labels_prefix}}} {}\n",
-                            format_float(state.sum)));
-                        out.push_str(&format!("{base}_count{{{labels_prefix}}} {}\n", state.count));
+                        out.push_str(&format!(
+                            "{base}_bucket{{{labels_prefix}{comma}le=\"+Inf\"}} {}\n",
+                            state.bucket_counts.last().copied().unwrap_or(0)
+                        ));
+                        out.push_str(&format!(
+                            "{base}_sum{{{labels_prefix}}} {}\n",
+                            format_float(state.sum)
+                        ));
+                        out.push_str(&format!(
+                            "{base}_count{{{labels_prefix}}} {}\n",
+                            state.count
+                        ));
                     }
                 }
             }
@@ -211,31 +235,52 @@ impl MetricsRegistry {
     pub fn snapshot(&self) -> Snapshot {
         let names = self.names.read().unwrap();
         let series = self.series.read().unwrap();
-        let metrics: Vec<Metric> = names.iter().map(|(n, (k, h))| Metric {
-            name: n.clone(), kind: *k, help: h.clone(),
-        }).collect();
-        let points: Vec<SeriesPoint> = series.iter().map(|(key, state)| {
-            let name = key.split('{').next().unwrap_or(key).to_string();
-            let labels = parse_labels(key);
-            let histogram = if state.kind == MetricKind::Histogram {
-                Some(HistogramBucketSet {
-                    bounds: state.bucket_bounds.clone(),
-                    counts: state.bucket_counts.clone(),
-                    sum: state.sum,
-                    count: state.count,
-                })
-            } else { None };
-            SeriesPoint { name, labels, value: state.scalar, histogram }
-        }).collect();
-        Snapshot { metrics, series: points }
+        let metrics: Vec<Metric> = names
+            .iter()
+            .map(|(n, (k, h))| Metric {
+                name: n.clone(),
+                kind: *k,
+                help: h.clone(),
+            })
+            .collect();
+        let points: Vec<SeriesPoint> = series
+            .iter()
+            .map(|(key, state)| {
+                let name = key.split('{').next().unwrap_or(key).to_string();
+                let labels = parse_labels(key);
+                let histogram = if state.kind == MetricKind::Histogram {
+                    Some(HistogramBucketSet {
+                        bounds: state.bucket_bounds.clone(),
+                        counts: state.bucket_counts.clone(),
+                        sum: state.sum,
+                        count: state.count,
+                    })
+                } else {
+                    None
+                };
+                SeriesPoint {
+                    name,
+                    labels,
+                    value: state.scalar,
+                    histogram,
+                }
+            })
+            .collect();
+        Snapshot {
+            metrics,
+            series: points,
+        }
     }
 }
 
 fn series_key(name: &str, labels: &[(&str, &str)]) -> String {
-    if labels.is_empty() { return name.into(); }
+    if labels.is_empty() {
+        return name.into();
+    }
     let mut sorted: Vec<(&&str, &&str)> = labels.iter().map(|(k, v)| (k, v)).collect();
     sorted.sort_by_key(|(k, _)| **k);
-    let parts: Vec<String> = sorted.iter()
+    let parts: Vec<String> = sorted
+        .iter()
         .map(|(k, v)| format!("{k}=\"{}\"", escape(v)))
         .collect();
     format!("{name}{{{}}}", parts.join(","))
@@ -244,11 +289,11 @@ fn series_key(name: &str, labels: &[(&str, &str)]) -> String {
 fn parse_labels(key: &str) -> BTreeMap<String, String> {
     let mut out = BTreeMap::new();
     if let Some(brace) = key.find('{') {
-        let inner = &key[brace+1..key.len()-1];
+        let inner = &key[brace + 1..key.len() - 1];
         for pair in inner.split(',') {
             if let Some(eq) = pair.find('=') {
                 let k = &pair[..eq];
-                let v = pair[eq+1..].trim_matches('"');
+                let v = pair[eq + 1..].trim_matches('"');
                 out.insert(k.into(), v.into());
             }
         }
@@ -257,7 +302,9 @@ fn parse_labels(key: &str) -> BTreeMap<String, String> {
 }
 
 fn escape(s: &str) -> String {
-    s.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', "\\n")
+    s.replace('\\', "\\\\")
+        .replace('"', "\\\"")
+        .replace('\n', "\\n")
 }
 
 fn format_float(v: f64) -> String {
@@ -275,9 +322,19 @@ mod tests {
     #[test]
     fn counter_increments_and_renders() {
         let r = MetricsRegistry::new();
-        r.register("d365_service_calls_total", MetricKind::Counter, "Total OData service calls");
-        r.inc_counter("d365_service_calls_total", &[("operation", "ReleasedProductGetDetail")]);
-        r.inc_counter("d365_service_calls_total", &[("operation", "ReleasedProductGetDetail")]);
+        r.register(
+            "d365_service_calls_total",
+            MetricKind::Counter,
+            "Total OData service calls",
+        );
+        r.inc_counter(
+            "d365_service_calls_total",
+            &[("operation", "ReleasedProductGetDetail")],
+        );
+        r.inc_counter(
+            "d365_service_calls_total",
+            &[("operation", "ReleasedProductGetDetail")],
+        );
         r.inc_counter("d365_service_calls_total", &[("operation", "EntityRead")]);
         let out = r.render();
         assert!(out.contains("# TYPE d365_service_calls_total counter"));
@@ -288,10 +345,26 @@ mod tests {
     #[test]
     fn histogram_records_buckets_correctly() {
         let r = MetricsRegistry::new();
-        r.register("mcp_tool_latency_seconds", MetricKind::Histogram, "Tool latency");
-        r.observe_histogram("mcp_tool_latency_seconds", &[("tool", "d365.docs.search")], 0.0003);
-        r.observe_histogram("mcp_tool_latency_seconds", &[("tool", "d365.docs.search")], 0.07);
-        r.observe_histogram("mcp_tool_latency_seconds", &[("tool", "d365.docs.search")], 0.2);
+        r.register(
+            "mcp_tool_latency_seconds",
+            MetricKind::Histogram,
+            "Tool latency",
+        );
+        r.observe_histogram(
+            "mcp_tool_latency_seconds",
+            &[("tool", "d365.docs.search")],
+            0.0003,
+        );
+        r.observe_histogram(
+            "mcp_tool_latency_seconds",
+            &[("tool", "d365.docs.search")],
+            0.07,
+        );
+        r.observe_histogram(
+            "mcp_tool_latency_seconds",
+            &[("tool", "d365.docs.search")],
+            0.2,
+        );
         let out = r.render();
         // 0.0003s ≤ 0.0005 → in 0.0005 bucket
         assert!(out.contains("le=\"0.0005\"} 1"));

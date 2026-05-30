@@ -36,7 +36,12 @@ pub struct IngestionPipeline {
 
 impl IngestionPipeline {
     pub fn new(embedder: Arc<dyn EmbeddingClient>, store: Arc<dyn KnowledgeStore>) -> Self {
-        Self { embedder, store, chunker: ChunkerConfig::default(), batch_size: 32 }
+        Self {
+            embedder,
+            store,
+            chunker: ChunkerConfig::default(),
+            batch_size: 32,
+        }
     }
 
     pub fn with_chunker(mut self, cfg: ChunkerConfig) -> Self {
@@ -74,10 +79,12 @@ impl IngestionPipeline {
                 }
             }
 
-            self.store.upsert(UpsertBatch {
-                documents: vec![doc],
-                chunks: embedded,
-            }).await?;
+            self.store
+                .upsert(UpsertBatch {
+                    documents: vec![doc],
+                    chunks: embedded,
+                })
+                .await?;
         }
         info!(?report, "ingestion complete");
         Ok(report)
@@ -120,12 +127,18 @@ mod tests {
         assert!(report.chunks >= 2);
 
         // Search by intent: query embedded to vector, store returns the right page.
-        let q_vec = embedder.embed(&["period close GeneralJournalAccountEntry reconciliation".to_string()]).await.unwrap();
-        let hits = store.search(
-            SearchQuery::text("period close GeneralJournalAccountEntry reconciliation", 5)
-                .with_embedding(q_vec[0].clone())
-                .with_domain(Domain::Learn),
-        ).await.unwrap();
+        let q_vec = embedder
+            .embed(&["period close GeneralJournalAccountEntry reconciliation".to_string()])
+            .await
+            .unwrap();
+        let hits = store
+            .search(
+                SearchQuery::text("period close GeneralJournalAccountEntry reconciliation", 5)
+                    .with_embedding(q_vec[0].clone())
+                    .with_domain(Domain::Learn),
+            )
+            .await
+            .unwrap();
 
         assert!(!hits.is_empty());
         // Top hit should be the period-close doc.

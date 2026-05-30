@@ -1,5 +1,5 @@
+pub mod kb;
+pub mod logs;
+pub mod rag;
 pub mod sessions;
 pub mod tools;
-pub mod kb;
-pub mod rag;
-pub mod logs;

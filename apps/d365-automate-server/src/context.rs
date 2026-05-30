@@ -1,7 +1,7 @@
 //! Shared server context — held in an `Arc` and cloned into every tool.
 
-use d365_automate_meta::MetadataClient;
 use d365_automate_ingest::EmbeddingClient;
+use d365_automate_meta::MetadataClient;
 use d365_automate_observability::AuditLog;
 use d365_automate_odata::{D365Client, MetadataCache, MockD365Client};
 use d365_automate_rag::{GraphEngine, RagEngine};

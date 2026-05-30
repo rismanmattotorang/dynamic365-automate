@@ -34,15 +34,26 @@ pub trait MetadataClient: Send + Sync {
     async fn get_data_entity(&self, name: &str) -> MetaResult<DataEntityView>;
 
     async fn search(&self, request: MetaSearchRequest) -> MetaResult<Vec<MetaSearchHit>>;
-    async fn cross_reference(&self, request: CrossReferenceRequest) -> MetaResult<Vec<CrossReferenceHit>>;
+    async fn cross_reference(
+        &self,
+        request: CrossReferenceRequest,
+    ) -> MetaResult<Vec<CrossReferenceHit>>;
 
     /// Read data-entity contents. Some environments block bulk entity reads
     /// at policy level; the call then returns `MetaError::EntityDataBlocked`
     /// so the agent can fall back to the OData path (`d365.entity.read`).
-    async fn get_entity_contents(&self, entity: &str, max_rows: usize) -> MetaResult<Vec<EntityRow>>;
+    async fn get_entity_contents(
+        &self,
+        entity: &str,
+        max_rows: usize,
+    ) -> MetaResult<Vec<EntityRow>>;
 
     // --- Write (gated by `ctx.read_only`) ---------------------------------
 
     /// Build & deploy an object (the analog of ADT `activate`).
-    async fn deploy(&self, request: DeployRequest, ctx: MetaCallContext) -> MetaResult<DeployOutcome>;
+    async fn deploy(
+        &self,
+        request: DeployRequest,
+        ctx: MetaCallContext,
+    ) -> MetaResult<DeployOutcome>;
 }

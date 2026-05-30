@@ -162,8 +162,11 @@ only as they land, so the tree always compiles.
 - Re-grounded fixtures (entities, services, security) in D365 canon and ported the correctness invariants per §4 (`every_write_operation_uses_changeset`, `every_company_scoped_entity_has_dataareaid_key`, `general_journal_account_entry_is_the_subledger_truth`, …).
 - **Exit:** 130 tests pass (44 new), clippy clean. ✅ *Done — see CHANGELOG 0.3.0.*
 
-### Phase 3b — live transports *(deferred)*
-- `HttpD365Client` (F&O OData v4 + Custom Service + `$batch` over Entra OAuth2) behind the `http` feature; live Metadata API client behind `d365-automate-meta/http`; connection-file loaders. The mock remains the default so CI without an environment is unaffected — mirroring the source's own "mock now, live later" phasing. Phase 4 (server) runs against the mock, so it is unblocked.
+### ✅ Phase 3b — live transports *(done)*
+- **`HttpD365Client`** (`d365-automate-odata`, feature `http`): live F&O OData v4 client over **Microsoft Entra ID** OAuth2 client-credentials (token cache), entity reads (`$select`/`$filter`/`$top` with `dataAreaId` injection, `like`→`contains` translation), unbound OData action POSTs, structured status→error mapping. Metadata/search/structure are served from the curated catalogue so the read-only safety annotations stay stable; data ops are live.
+- **`HttpMetadataClient`** (`d365-automate-meta`, feature `http`): live Metadata API reads (`/metadata/...`, `/data/...`) over Entra OAuth2, plus a TOML **connection-file loader** (`load_connection`). `deploy` is gated and points to LCS; `cross_reference` is documented as not exposed over this transport.
+- **Server wiring:** the binary selects live-vs-mock at runtime — `HttpD365Client::from_env()` when `D365_RESOURCE` is set, `HttpMetadataClient` when `--connection <name>` resolves to a non-mock connection file — otherwise the offline mocks. Backends remain `Arc<dyn …>` so the swap is one site.
+- **Exit:** `http`-feature builds + 56 unit tests pass (URL/query/`$batch`/token/error builders, connection round-trip); clippy clean; live backend verified to activate via env (Entra OAuth2, secret redacted). CI exercises the `http` feature. ✅ *Done — see CHANGELOG 0.9.0.*
 
 ### ✅ Phase 4 — MCP server (tools / resources / prompts / seed) *(done)*
 - `apps/d365-automate-server`: re-mapped the tool surface to `d365.*` / `xpp.meta.*` per §6 (37 tools across rag / service / meta / graph / workflow groups), resources to `d365-*://` (env, entity, service, meta, cache, guardrails), prompts (`d365.review-service-call`, `d365.deploy-impact-analysis`, `xpp.review-cross-reference` + disk-loaded skills), and the D365 seed corpus.

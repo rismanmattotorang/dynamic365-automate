@@ -393,7 +393,7 @@ dependencies = [
 
 [[package]]
 name = "d365-automate-bench"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -409,7 +409,7 @@ dependencies = [
 
 [[package]]
 name = "d365-automate-channels"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "async-trait",
  "serde",
@@ -421,7 +421,7 @@ dependencies = [
 
 [[package]]
 name = "d365-automate-connectors"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -431,7 +431,7 @@ dependencies = [
 
 [[package]]
 name = "d365-automate-graph"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -442,7 +442,7 @@ dependencies = [
 
 [[package]]
 name = "d365-automate-gw"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -462,7 +462,7 @@ dependencies = [
 
 [[package]]
 name = "d365-automate-ingest"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "async-trait",
  "d365-automate-kb",
@@ -480,7 +480,7 @@ dependencies = [
 
 [[package]]
 name = "d365-automate-ingest-bin"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -495,7 +495,7 @@ dependencies = [
 
 [[package]]
 name = "d365-automate-kb"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "async-trait",
  "hex",
@@ -510,7 +510,7 @@ dependencies = [
 
 [[package]]
 name = "d365-automate-memory"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "async-trait",
  "serde",
@@ -522,7 +522,7 @@ dependencies = [
 
 [[package]]
 name = "d365-automate-meta"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "async-trait",
  "reqwest",
@@ -536,7 +536,7 @@ dependencies = [
 
 [[package]]
 name = "d365-automate-observability"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "async-trait",
  "serde",
@@ -548,7 +548,7 @@ dependencies = [
 
 [[package]]
 name = "d365-automate-odata"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "async-trait",
  "reqwest",
@@ -562,7 +562,7 @@ dependencies = [
 
 [[package]]
 name = "d365-automate-rag"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "async-trait",
  "d365-automate-graph",
@@ -575,7 +575,7 @@ dependencies = [
 
 [[package]]
 name = "d365-automate-scheduler"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "async-trait",
  "serde",
@@ -588,7 +588,7 @@ dependencies = [
 
 [[package]]
 name = "d365-automate-server"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -614,7 +614,7 @@ dependencies = [
 
 [[package]]
 name = "d365-automate-skills"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -626,7 +626,7 @@ dependencies = [
 
 [[package]]
 name = "d365-automate-tui"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -1405,7 +1405,7 @@ checksum = "0e7465ac9959cc2b1404e8e2367b43684a6d13790fe23056cc8c6c5a6b7bcb94"
 
 [[package]]
 name = "mcp-client"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "async-trait",
  "futures",
@@ -1419,7 +1419,7 @@ dependencies = [
 
 [[package]]
 name = "mcp-core"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -1429,7 +1429,7 @@ dependencies = [
 
 [[package]]
 name = "mcp-server"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "async-trait",
  "futures",
@@ -1445,7 +1445,7 @@ dependencies = [
 
 [[package]]
 name = "mcp-transport"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "async-trait",
  "axum",
@@ -2030,7 +2030,7 @@ checksum = "9774ba4a74de5f7b1c1451ed6cd5285a32eddb5cccb8cc655a4e50009e06477f"
 
 [[package]]
 name = "sample-client"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2046,7 +2046,7 @@ dependencies = [
 
 [[package]]
 name = "sample-server"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "anyhow",
  "async-trait",

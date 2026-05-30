@@ -84,4 +84,6 @@ pub struct Edge {
     pub weight: f32,
 }
 
-fn default_weight() -> f32 { 1.0 }
+fn default_weight() -> f32 {
+    1.0
+}

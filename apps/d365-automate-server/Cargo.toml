@@ -17,8 +17,8 @@ path = "src/lib.rs"
 mcp-core = { workspace = true }
 mcp-transport = { workspace = true, features = ["http"] }
 mcp-server = { workspace = true }
-d365-automate-odata = { workspace = true }
-d365-automate-meta = { workspace = true }
+d365-automate-odata = { workspace = true, features = ["http"] }
+d365-automate-meta = { workspace = true, features = ["http"] }
 d365-automate-kb = { workspace = true }
 d365-automate-rag = { workspace = true }
 d365-automate-graph = { workspace = true }

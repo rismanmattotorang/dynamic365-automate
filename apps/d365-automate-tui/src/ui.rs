@@ -16,9 +16,9 @@ pub fn draw(f: &mut Frame, app: &App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3),   // top tab bar
-            Constraint::Min(0),      // body
-            Constraint::Length(1),   // status bar
+            Constraint::Length(3), // top tab bar
+            Constraint::Min(0),    // body
+            Constraint::Length(1), // status bar
         ])
         .split(f.area());
 
@@ -35,19 +35,31 @@ pub fn draw(f: &mut Frame, app: &App) {
 }
 
 fn draw_tabs(f: &mut Frame, app: &App, area: Rect) {
-    let titles: Vec<Line> = TAB_NAMES.iter().enumerate().map(|(i, name)| {
-        Line::from(vec![
-            Span::styled(format!(" {} ", i + 1), Style::default().fg(Color::DarkGray)),
-            Span::styled(*name, Style::default().fg(Color::White)),
-        ])
-    }).collect();
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .title(Span::styled(" D365-Automate / operator console ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)));
+    let titles: Vec<Line> = TAB_NAMES
+        .iter()
+        .enumerate()
+        .map(|(i, name)| {
+            Line::from(vec![
+                Span::styled(format!(" {} ", i + 1), Style::default().fg(Color::DarkGray)),
+                Span::styled(*name, Style::default().fg(Color::White)),
+            ])
+        })
+        .collect();
+    let block = Block::default().borders(Borders::ALL).title(Span::styled(
+        " D365-Automate / operator console ",
+        Style::default()
+            .fg(Color::Cyan)
+            .add_modifier(Modifier::BOLD),
+    ));
     let tabs = Tabs::new(titles)
         .block(block)
         .select(app.current_tab)
-        .highlight_style(Style::default().fg(Color::Black).bg(Color::Cyan).add_modifier(Modifier::BOLD))
+        .highlight_style(
+            Style::default()
+                .fg(Color::Black)
+                .bg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        )
         .divider(Span::raw("│"));
     f.render_widget(tabs, area);
 }
@@ -57,12 +69,21 @@ fn draw_status_bar(f: &mut Frame, app: &App, area: Rect) {
     let total_calls: u64 = app.tools.values().map(|s| s.invocations).sum();
     let errors: u64 = app.tools.values().map(|s| s.errors).sum();
     let status = Line::from(vec![
-        Span::styled(" D365-Automate ", Style::default().fg(Color::Black).bg(Color::Cyan)),
+        Span::styled(
+            " D365-Automate ",
+            Style::default().fg(Color::Black).bg(Color::Cyan),
+        ),
         Span::raw(format!(
             "  up {:>3}s | sessions {:>2} | calls {:>5} | errors {:>3} | ",
-            uptime.as_secs(), app.sessions.len(), total_calls, errors,
+            uptime.as_secs(),
+            app.sessions.len(),
+            total_calls,
+            errors,
         )),
-        Span::styled("[1–5] tabs  [j/k] scroll  [q] quit", Style::default().fg(Color::DarkGray)),
+        Span::styled(
+            "[1–5] tabs  [j/k] scroll  [q] quit",
+            Style::default().fg(Color::DarkGray),
+        ),
     ]);
     f.render_widget(Paragraph::new(status), area);
 }

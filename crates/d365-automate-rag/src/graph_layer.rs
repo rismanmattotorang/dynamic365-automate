@@ -8,8 +8,8 @@
 //! results regardless of which layer fired.
 
 use d365_automate_graph::{
-    detect_communities, multi_hop_search, build_raptor_tree, Communities, InMemoryGraph,
-    PprConfig, RaptorTree,
+    build_raptor_tree, detect_communities, multi_hop_search, Communities, InMemoryGraph, PprConfig,
+    RaptorTree,
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -74,24 +74,41 @@ impl GraphEngine {
     pub fn new(graph: Arc<InMemoryGraph>) -> Self {
         let communities = Arc::new(detect_communities(&graph));
         let raptor = Arc::new(build_raptor_tree(&graph, &communities));
-        Self { graph, communities, raptor }
+        Self {
+            graph,
+            communities,
+            raptor,
+        }
     }
 
     /// L4 HippoRAG path-based Q&A.
-    pub fn multi_hop(&self, query: &str, max_hops: u32, top_k: usize, max_seeds: usize) -> GraphSearchResponse {
+    pub fn multi_hop(
+        &self,
+        query: &str,
+        max_hops: u32,
+        top_k: usize,
+        max_seeds: usize,
+    ) -> GraphSearchResponse {
         let t0 = Instant::now();
-        let cfg = PprConfig { max_hops, ..PprConfig::default() };
+        let cfg = PprConfig {
+            max_hops,
+            ..PprConfig::default()
+        };
         let r = multi_hop_search(&self.graph, query, max_seeds, &cfg, top_k);
-        let hits = r.ranked.iter().filter_map(|h| {
-            self.graph.node(&h.id).map(|e| GraphSearchHit {
-                id: e.id.clone(),
-                label: e.label.clone(),
-                kind: format!("{:?}", e.kind),
-                uri: e.uri.clone(),
-                score: h.score,
-                hops: h.hops,
+        let hits = r
+            .ranked
+            .iter()
+            .filter_map(|h| {
+                self.graph.node(&h.id).map(|e| GraphSearchHit {
+                    id: e.id.clone(),
+                    label: e.label.clone(),
+                    kind: format!("{:?}", e.kind),
+                    uri: e.uri.clone(),
+                    score: h.score,
+                    hops: h.hops,
+                })
             })
-        }).collect();
+            .collect();
         GraphSearchResponse {
             layer: "L4 HippoRAG".into(),
             seeds: r.seeds,
@@ -103,21 +120,33 @@ impl GraphEngine {
 
     /// L4 HippoRAG over an explicit list of seed entity IDs (used by
     /// `kb.graph_neighborhood`).
-    pub fn neighborhood(&self, seeds: &[String], max_hops: u32, top_k: usize) -> GraphSearchResponse {
+    pub fn neighborhood(
+        &self,
+        seeds: &[String],
+        max_hops: u32,
+        top_k: usize,
+    ) -> GraphSearchResponse {
         let t0 = Instant::now();
-        let cfg = PprConfig { max_hops, ..PprConfig::default() };
+        let cfg = PprConfig {
+            max_hops,
+            ..PprConfig::default()
+        };
         let r = d365_automate_graph::personalised_pagerank(&self.graph, seeds, &cfg);
-        let hits: Vec<GraphSearchHit> = r.ranked.iter()
+        let hits: Vec<GraphSearchHit> = r
+            .ranked
+            .iter()
             .filter(|h| h.hops <= max_hops)
             .take(top_k)
-            .filter_map(|h| self.graph.node(&h.id).map(|e| GraphSearchHit {
-                id: e.id.clone(),
-                label: e.label.clone(),
-                kind: format!("{:?}", e.kind),
-                uri: e.uri.clone(),
-                score: h.score,
-                hops: h.hops,
-            }))
+            .filter_map(|h| {
+                self.graph.node(&h.id).map(|e| GraphSearchHit {
+                    id: e.id.clone(),
+                    label: e.label.clone(),
+                    kind: format!("{:?}", e.kind),
+                    uri: e.uri.clone(),
+                    score: h.score,
+                    hops: h.hops,
+                })
+            })
             .collect();
         GraphSearchResponse {
             layer: "L4 HippoRAG (explicit seeds)".into(),
@@ -134,16 +163,22 @@ impl GraphEngine {
         let t0 = Instant::now();
         let q = query.to_lowercase();
         let terms: Vec<&str> = q.split_whitespace().filter(|t| t.len() >= 2).collect();
-        let mut scored: Vec<CommunityView> = self.communities.communities.iter().map(|c| {
-            let hay = c.summary.to_lowercase();
-            let overlap: usize = terms.iter().map(|t| hay.matches(t).count()).sum();
-            CommunityView {
-                id: c.id,
-                members: c.members.clone(),
-                summary: c.summary.clone(),
-                overlap_score: overlap,
-            }
-        }).filter(|v| v.overlap_score > 0).collect();
+        let mut scored: Vec<CommunityView> = self
+            .communities
+            .communities
+            .iter()
+            .map(|c| {
+                let hay = c.summary.to_lowercase();
+                let overlap: usize = terms.iter().map(|t| hay.matches(t).count()).sum();
+                CommunityView {
+                    id: c.id,
+                    members: c.members.clone(),
+                    summary: c.summary.clone(),
+                    overlap_score: overlap,
+                }
+            })
+            .filter(|v| v.overlap_score > 0)
+            .collect();
         scored.sort_by(|a, b| b.overlap_score.cmp(&a.overlap_score));
         scored.truncate(top_k);
         CommunityQueryResponse {
@@ -156,16 +191,23 @@ impl GraphEngine {
     /// L5 RAPTOR summarisation at the requested level.
     pub fn raptor_summary(&self, level: u32, top_k: usize) -> RaptorSummaryResponse {
         let t0 = Instant::now();
-        let nodes = self.raptor.levels.iter()
+        let nodes = self
+            .raptor
+            .levels
+            .iter()
             .find(|l| l.level == level)
             .map(|l| l.nodes.clone())
             .unwrap_or_default();
-        let views: Vec<RaptorView> = nodes.into_iter().take(top_k).map(|n| RaptorView {
-            id: n.id,
-            level: n.level,
-            summary: n.summary,
-            member_count: n.members.len(),
-        }).collect();
+        let views: Vec<RaptorView> = nodes
+            .into_iter()
+            .take(top_k)
+            .map(|n| RaptorView {
+                id: n.id,
+                level: n.level,
+                summary: n.summary,
+                member_count: n.members.len(),
+            })
+            .collect();
         RaptorSummaryResponse {
             level,
             nodes: views,
@@ -178,15 +220,41 @@ impl GraphEngine {
     pub fn route(&self, query: &str, scope_hint: Option<&str>) -> Vec<&'static str> {
         let lc = query.to_lowercase();
         let global = matches!(scope_hint, Some("global"))
-            || ["across", "all", "every", "summarise", "summarize", "overall", "in general"]
-                .iter().any(|kw| lc.contains(kw));
-        let multi_hop = ["impact", "where used", "depends on", "calls", "callers", "downstream", "upstream", "trace"]
-            .iter().any(|kw| lc.contains(kw));
+            || [
+                "across",
+                "all",
+                "every",
+                "summarise",
+                "summarize",
+                "overall",
+                "in general",
+            ]
+            .iter()
+            .any(|kw| lc.contains(kw));
+        let multi_hop = [
+            "impact",
+            "where used",
+            "depends on",
+            "calls",
+            "callers",
+            "downstream",
+            "upstream",
+            "trace",
+        ]
+        .iter()
+        .any(|kw| lc.contains(kw));
 
         let mut layers = Vec::new();
-        if global && !multi_hop { layers.push("L3"); layers.push("L5"); }
-        if multi_hop { layers.push("L4"); }
-        if layers.is_empty() { layers.push("L2"); }
+        if global && !multi_hop {
+            layers.push("L3");
+            layers.push("L5");
+        }
+        if multi_hop {
+            layers.push("L4");
+        }
+        if layers.is_empty() {
+            layers.push("L2");
+        }
         layers
     }
 }

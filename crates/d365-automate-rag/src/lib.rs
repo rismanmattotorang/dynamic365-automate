@@ -44,7 +44,12 @@ pub struct Hit {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum Layer { Hybrid, GraphRag, HippoRag, Raptor }
+pub enum Layer {
+    Hybrid,
+    GraphRag,
+    HippoRag,
+    Raptor,
+}
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct LatencyBreakdown {
@@ -113,8 +118,9 @@ impl From<&SearchHit> for HitView {
 }
 
 fn truncate(s: &str, n: usize) -> String {
-    if s.chars().count() <= n { s.to_string() }
-    else {
+    if s.chars().count() <= n {
+        s.to_string()
+    } else {
         let mut o: String = s.chars().take(n).collect();
         o.push('…');
         o
@@ -132,7 +138,12 @@ pub struct RagEngine {
 
 impl RagEngine {
     pub fn new(store: Arc<dyn KnowledgeStore>) -> Self {
-        Self { store, reranker: None, rrf_k: 60.0, candidate_pool: 40 }
+        Self {
+            store,
+            reranker: None,
+            rrf_k: 60.0,
+            candidate_pool: 40,
+        }
     }
 
     /// Borrowed handle to the underlying `KnowledgeStore`.  Used by tools
@@ -160,35 +171,49 @@ impl RagEngine {
     /// Backwards-compatible flat search used by the existing MCP tools.
     /// Internally routes through `hybrid_search` so every caller benefits
     /// from BM25 + RRF + reranker.
-    pub async fn search<'a>(&self, query: Query<'a>) -> Result<Vec<Hit>, d365_automate_kb::StoreError> {
+    pub async fn search<'a>(
+        &self,
+        query: Query<'a>,
+    ) -> Result<Vec<Hit>, d365_automate_kb::StoreError> {
         let resp = self.hybrid_search(query).await?;
-        let hits = resp.hits.into_iter().map(|view| Hit {
-            hit: SearchHit {
-                chunk: d365_automate_kb::Chunk {
-                    id: view.document_id.clone(),
-                    document_id: view.document_id,
-                    domain: Domain::Learn, // placeholder; reconstruct from store on demand
-                    ordinal: 0,
-                    text: view.snippet,
-                    embedding: None,
-                    breadcrumbs: Vec::new(),
-                    title: view.title,
-                    uri: view.uri,
+        let hits = resp
+            .hits
+            .into_iter()
+            .map(|view| Hit {
+                hit: SearchHit {
+                    chunk: d365_automate_kb::Chunk {
+                        id: view.document_id.clone(),
+                        document_id: view.document_id,
+                        domain: Domain::Learn, // placeholder; reconstruct from store on demand
+                        ordinal: 0,
+                        text: view.snippet,
+                        embedding: None,
+                        breadcrumbs: Vec::new(),
+                        title: view.title,
+                        uri: view.uri,
+                    },
+                    score: view.score,
                 },
-                score: view.score,
-            },
-            layer: Layer::Hybrid,
-        }).collect();
+                layer: Layer::Hybrid,
+            })
+            .collect();
         Ok(hits)
     }
 
     /// Layer-2 hybrid pipeline with timing breakdown.
-    pub async fn hybrid_search<'a>(&self, query: Query<'a>) -> Result<SearchResponse, d365_automate_kb::StoreError> {
+    pub async fn hybrid_search<'a>(
+        &self,
+        query: Query<'a>,
+    ) -> Result<SearchResponse, d365_automate_kb::StoreError> {
         let total_start = Instant::now();
 
         let mut kb_query = SearchQuery::text(query.text, self.candidate_pool);
-        if let Some(d) = query.domain { kb_query = kb_query.with_domain(d); }
-        if let Some(e) = &query.embedding { kb_query = kb_query.clone().with_embedding(e.clone()); }
+        if let Some(d) = query.domain {
+            kb_query = kb_query.with_domain(d);
+        }
+        if let Some(e) = &query.embedding {
+            kb_query = kb_query.clone().with_embedding(e.clone());
+        }
 
         // --- dense + sparse in one store call -----------------------------
         let dense_start = Instant::now();
@@ -210,10 +235,13 @@ impl RagEngine {
         let rerank_start = Instant::now();
         let reranked: Vec<SearchHit> = match &self.reranker {
             Some(r) => {
-                let candidates: Vec<RerankerCandidate> = fused.iter().map(|h| RerankerCandidate {
-                    chunk_text: h.chunk.text.clone(),
-                    base_score: h.score,
-                }).collect();
+                let candidates: Vec<RerankerCandidate> = fused
+                    .iter()
+                    .map(|h| RerankerCandidate {
+                        chunk_text: h.chunk.text.clone(),
+                        base_score: h.score,
+                    })
+                    .collect();
                 let order = r.rerank(query.text, &candidates).await;
                 let mut out = Vec::with_capacity(fused.len());
                 for (rank, score) in order.iter().enumerate() {
@@ -241,7 +269,10 @@ impl RagEngine {
             hits: top.iter().map(HitView::from).collect(),
             layer: Layer::Hybrid,
             latency: LatencyBreakdown {
-                dense_us, sparse_us, fusion_us, rerank_us,
+                dense_us,
+                sparse_us,
+                fusion_us,
+                rerank_us,
                 total_us: total_start.elapsed().as_micros() as u64,
             },
             diagnostics: RetrievalDiagnostics {
@@ -264,7 +295,10 @@ fn rank_overlap(dense: &[SearchHit], sparse: &[SearchHit]) -> usize {
         return 0;
     }
     let dense_ids: HashSet<&str> = dense.iter().map(|h| h.chunk.id.as_str()).collect();
-    sparse.iter().filter(|h| dense_ids.contains(h.chunk.id.as_str())).count()
+    sparse
+        .iter()
+        .filter(|h| dense_ids.contains(h.chunk.id.as_str()))
+        .count()
 }
 
 /// Same tokeniser the BM25 path uses inside the store, lifted here so the
@@ -277,11 +311,16 @@ fn tokenize_query(text: &str) -> Vec<String> {
         if ch.is_alphanumeric() || ch == '_' {
             current.push(ch.to_ascii_lowercase());
         } else if !current.is_empty() {
-            if current.len() >= 2 { out.push(std::mem::take(&mut current)); }
-            else { current.clear(); }
+            if current.len() >= 2 {
+                out.push(std::mem::take(&mut current));
+            } else {
+                current.clear();
+            }
         }
     }
-    if current.len() >= 2 { out.push(current); }
+    if current.len() >= 2 {
+        out.push(current);
+    }
     out
 }
 
@@ -299,21 +338,31 @@ pub fn reciprocal_rank_fusion(
     for (rank, h) in dense.iter().enumerate() {
         let contrib = 1.0 / (k + rank as f32 + 1.0);
         let key = h.chunk.id.clone();
-        fused_scores.entry(key)
+        fused_scores
+            .entry(key)
             .and_modify(|(s, _)| *s += contrib)
             .or_insert_with(|| (contrib, h.clone()));
     }
     for (rank, h) in sparse.iter().enumerate() {
         let contrib = 1.0 / (k + rank as f32 + 1.0);
         let key = h.chunk.id.clone();
-        fused_scores.entry(key)
+        fused_scores
+            .entry(key)
             .and_modify(|(s, _)| *s += contrib)
             .or_insert_with(|| (contrib, h.clone()));
     }
-    let mut out: Vec<SearchHit> = fused_scores.into_values()
-        .map(|(score, mut h)| { h.score = score; h })
+    let mut out: Vec<SearchHit> = fused_scores
+        .into_values()
+        .map(|(score, mut h)| {
+            h.score = score;
+            h
+        })
         .collect();
-    out.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    out.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     out.truncate(cap);
     out
 }
@@ -349,8 +398,10 @@ mod tests {
         // The top fused result should reward consensus.  Both 'a' and 'c'
         // beat 'b' (only in dense) and 'd' (only in sparse).
         let top_ids: Vec<_> = fused.iter().take(2).map(|h| h.chunk.id.clone()).collect();
-        assert!(top_ids.contains(&"a".to_string()) && top_ids.contains(&"c".to_string()),
-            "expected a + c at top; got {top_ids:?}");
+        assert!(
+            top_ids.contains(&"a".to_string()) && top_ids.contains(&"c".to_string()),
+            "expected a + c at top; got {top_ids:?}"
+        );
     }
 
     #[test]

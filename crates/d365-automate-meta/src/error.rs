@@ -37,7 +37,9 @@ pub enum MetaErrorCode {
 }
 
 impl MetaErrorCode {
-    pub fn as_i32(self) -> i32 { self as i32 }
+    pub fn as_i32(self) -> i32 {
+        self as i32
+    }
     pub fn is_transient(self) -> bool {
         let v = self as i32;
         (-32199..=-32100).contains(&v)
@@ -107,7 +109,9 @@ impl MetaError {
         }
     }
 
-    pub fn is_transient(&self) -> bool { self.code().is_transient() }
+    pub fn is_transient(&self) -> bool {
+        self.code().is_transient()
+    }
 }
 
 #[cfg(test)]
@@ -117,19 +121,30 @@ mod tests {
     #[test]
     fn internal_is_permanent() {
         let e = MetaError::Internal("bug".into());
-        assert!(!e.is_transient(),
-            "MetaError::Internal must be permanent to prevent retry-loop on programmer bugs");
+        assert!(
+            !e.is_transient(),
+            "MetaError::Internal must be permanent to prevent retry-loop on programmer bugs"
+        );
     }
 
     #[test]
     fn transient_kinds_are_classified_correctly() {
-        for code in [MetaErrorCode::Timeout, MetaErrorCode::EnvironmentDown,
-                     MetaErrorCode::TokenRefresh, MetaErrorCode::RateLimited] {
+        for code in [
+            MetaErrorCode::Timeout,
+            MetaErrorCode::EnvironmentDown,
+            MetaErrorCode::TokenRefresh,
+            MetaErrorCode::RateLimited,
+        ] {
             assert!(code.is_transient(), "{code:?} should be transient");
         }
-        for code in [MetaErrorCode::AuthFailed, MetaErrorCode::NotFound,
-                     MetaErrorCode::Forbidden, MetaErrorCode::Internal,
-                     MetaErrorCode::EntityDataBlocked, MetaErrorCode::Locked] {
+        for code in [
+            MetaErrorCode::AuthFailed,
+            MetaErrorCode::NotFound,
+            MetaErrorCode::Forbidden,
+            MetaErrorCode::Internal,
+            MetaErrorCode::EntityDataBlocked,
+            MetaErrorCode::Locked,
+        ] {
             assert!(!code.is_transient(), "{code:?} should NOT be transient");
         }
     }

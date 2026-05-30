@@ -65,21 +65,39 @@ impl QdrantStore {
                 "distance": "Cosine",
             },
         });
-        let resp = self.http.put(&url).json(&body).send().await.map_err(req_err)?;
+        let resp = self
+            .http
+            .put(&url)
+            .json(&body)
+            .send()
+            .await
+            .map_err(req_err)?;
         if !resp.status().is_success() {
             let s = resp.text().await.unwrap_or_default();
             return Err(StoreError::Backend(format!("create {name}: {s}")));
         }
-        info!(collection = name, dim = self.embedding_dim, "qdrant collection created");
+        info!(
+            collection = name,
+            dim = self.embedding_dim,
+            "qdrant collection created"
+        );
         Ok(())
     }
 
     fn upsert_url(&self, domain: Domain) -> String {
-        format!("{}/collections/{}/points?wait=true", self.base_url, domain.collection())
+        format!(
+            "{}/collections/{}/points?wait=true",
+            self.base_url,
+            domain.collection()
+        )
     }
 
     fn search_url(&self, domain: Domain) -> String {
-        format!("{}/collections/{}/points/search", self.base_url, domain.collection())
+        format!(
+            "{}/collections/{}/points/search",
+            self.base_url,
+            domain.collection()
+        )
     }
 }
 
@@ -106,12 +124,16 @@ impl KnowledgeStore for QdrantStore {
         // Stash documents.
         {
             let mut docs = self.documents.write().await;
-            for d in &batch.documents { docs.insert(d.id.clone(), d.clone()); }
+            for d in &batch.documents {
+                docs.insert(d.id.clone(), d.clone());
+            }
         }
 
         // Group chunks by domain so each goes to its own collection.
         let mut by_domain: HashMap<Domain, Vec<&Chunk>> = HashMap::new();
-        for c in &batch.chunks { by_domain.entry(c.domain).or_default().push(c); }
+        for c in &batch.chunks {
+            by_domain.entry(c.domain).or_default().push(c);
+        }
 
         for (domain, chunks) in by_domain {
             let mut points: Vec<Value> = Vec::with_capacity(chunks.len());
@@ -122,7 +144,9 @@ impl KnowledgeStore for QdrantStore {
                 if embedding.len() != self.embedding_dim {
                     return Err(StoreError::Backend(format!(
                         "chunk {} embedding dim {} != configured {}",
-                        c.id, embedding.len(), self.embedding_dim,
+                        c.id,
+                        embedding.len(),
+                        self.embedding_dim,
                     )));
                 }
                 points.push(json!({
@@ -140,10 +164,20 @@ impl KnowledgeStore for QdrantStore {
                 }));
             }
             let body = json!({ "points": points });
-            let resp = self.http.put(self.upsert_url(domain)).json(&body).send().await.map_err(req_err)?;
+            let resp = self
+                .http
+                .put(self.upsert_url(domain))
+                .json(&body)
+                .send()
+                .await
+                .map_err(req_err)?;
             if !resp.status().is_success() {
                 let s = resp.text().await.unwrap_or_default();
-                return Err(StoreError::Backend(format!("upsert {}: {}", domain.collection(), s)));
+                return Err(StoreError::Backend(format!(
+                    "upsert {}: {}",
+                    domain.collection(),
+                    s
+                )));
             }
             debug!(domain = ?domain, count = chunks.len(), "upserted to qdrant");
         }
@@ -155,9 +189,10 @@ impl KnowledgeStore for QdrantStore {
     }
 
     async fn search(&self, query: SearchQuery) -> Result<Vec<SearchHit>, StoreError> {
-        let embedding = query.embedding.as_ref().ok_or_else(|| {
-            StoreError::Backend("qdrant search requires an embedding".into())
-        })?;
+        let embedding = query
+            .embedding
+            .as_ref()
+            .ok_or_else(|| StoreError::Backend("qdrant search requires an embedding".into()))?;
         let targets: Vec<Domain> = if query.domains.is_empty() {
             vec![Domain::Learn, Domain::Xpp, Domain::Flow, Domain::Solution]
         } else {
@@ -171,7 +206,13 @@ impl KnowledgeStore for QdrantStore {
                 "limit": query.top_k,
                 "with_payload": true,
             });
-            let resp = self.http.post(self.search_url(domain)).json(&body).send().await.map_err(req_err)?;
+            let resp = self
+                .http
+                .post(self.search_url(domain))
+                .json(&body)
+                .send()
+                .await
+                .map_err(req_err)?;
             if !resp.status().is_success() {
                 let s = resp.text().await.unwrap_or_default();
                 warn!(domain = ?domain, "qdrant search failed: {s}");
@@ -179,13 +220,19 @@ impl KnowledgeStore for QdrantStore {
             }
             let parsed: QdrantSearchResponse = resp.json().await.map_err(req_err)?;
             for h in parsed.result {
-                let chunk = chunk_from_payload(domain, &h.payload).ok_or_else(|| {
-                    StoreError::Backend("malformed qdrant payload".into())
-                })?;
-                all_hits.push(SearchHit { chunk, score: h.score });
+                let chunk = chunk_from_payload(domain, &h.payload)
+                    .ok_or_else(|| StoreError::Backend("malformed qdrant payload".into()))?;
+                all_hits.push(SearchHit {
+                    chunk,
+                    score: h.score,
+                });
             }
         }
-        all_hits.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        all_hits.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         all_hits.truncate(query.top_k);
         Ok(all_hits)
     }
@@ -196,7 +243,9 @@ impl KnowledgeStore for QdrantStore {
         for domain in [Domain::Learn, Domain::Xpp, Domain::Flow, Domain::Solution] {
             let url = format!("{}/collections/{}", self.base_url, domain.collection());
             let resp = self.http.get(&url).send().await.map_err(req_err)?;
-            if !resp.status().is_success() { continue; }
+            if !resp.status().is_success() {
+                continue;
+            }
             let v: Value = resp.json().await.map_err(req_err)?;
             if let Some(n) = v.pointer("/result/points_count").and_then(|n| n.as_u64()) {
                 total += n as usize;
@@ -217,10 +266,22 @@ fn chunk_from_payload(domain: Domain, payload: &Value) -> Option<Chunk> {
         breadcrumbs: payload
             .get("breadcrumbs")
             .and_then(|v| v.as_array())
-            .map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect())
+            .map(|a| {
+                a.iter()
+                    .filter_map(|x| x.as_str().map(String::from))
+                    .collect()
+            })
             .unwrap_or_default(),
-        title: payload.get("title").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-        uri: payload.get("uri").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+        title: payload
+            .get("title")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string(),
+        uri: payload
+            .get("uri")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string(),
     })
 }
 

@@ -47,7 +47,10 @@ pub struct EnvironmentInfo {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
-pub enum ParamDirection { In, Out }
+pub enum ParamDirection {
+    In,
+    Out,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServiceParameter {
@@ -80,10 +83,18 @@ pub struct SecurityReference {
 
 impl SecurityReference {
     pub fn read(privilege: &str) -> Self {
-        Self { privilege: privilege.into(), duty: None, access_level: "Read".into() }
+        Self {
+            privilege: privilege.into(),
+            duty: None,
+            access_level: "Read".into(),
+        }
     }
     pub fn maintain(privilege: &str, duty: &str) -> Self {
-        Self { privilege: privilege.into(), duty: Some(duty.into()), access_level: "Update".into() }
+        Self {
+            privilege: privilege.into(),
+            duty: Some(duty.into()),
+            access_level: "Update".into(),
+        }
     }
 }
 
@@ -146,8 +157,12 @@ pub struct ServiceCallRequest {
     pub require_read_only_safe: bool,
 }
 
-fn default_timeout_ms() -> u64 { 30_000 }
-fn default_true() -> bool { true }
+fn default_timeout_ms() -> u64 {
+    30_000
+}
+fn default_true() -> bool {
+    true
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BulkMetadata {
@@ -206,7 +221,9 @@ pub struct ReadEntityRequest {
     pub max_rows: usize,
 }
 
-fn default_max_rows() -> usize { 100 }
+fn default_max_rows() -> usize {
+    100
+}
 
 pub const MAX_ROWS_HARD_CAP: usize = 1000;
 
@@ -228,11 +245,23 @@ pub trait D365Client: Send + Sync {
 
     async fn search_service(&self, query: &str, limit: usize) -> D365Result<ServiceSearchResult>;
 
-    async fn service_metadata(&self, operation: &str, language: &str) -> D365Result<ServiceOperationMeta>;
+    async fn service_metadata(
+        &self,
+        operation: &str,
+        language: &str,
+    ) -> D365Result<ServiceOperationMeta>;
 
-    async fn bulk_service_metadata(&self, operations: &[String], language: &str) -> D365Result<BulkMetadata>;
+    async fn bulk_service_metadata(
+        &self,
+        operations: &[String],
+        language: &str,
+    ) -> D365Result<BulkMetadata>;
 
-    async fn call_service(&self, request: ServiceCallRequest, read_only_mode: bool) -> D365Result<serde_json::Value>;
+    async fn call_service(
+        &self,
+        request: ServiceCallRequest,
+        read_only_mode: bool,
+    ) -> D365Result<serde_json::Value>;
 
     async fn read_entity(&self, request: ReadEntityRequest) -> D365Result<Vec<EntityRow>>;
 
@@ -240,12 +269,18 @@ pub trait D365Client: Send + Sync {
 
     /// Pool snapshot for the TUI / Prometheus dashboards.
     fn pool_status(&self) -> PoolStatus {
-        PoolStatus { cap: 0, available: 0 }
+        PoolStatus {
+            cap: 0,
+            available: 0,
+        }
     }
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub struct PoolStatus { pub cap: usize, pub available: usize }
+pub struct PoolStatus {
+    pub cap: usize,
+    pub available: usize,
+}
 
 // ===========================================================================
 // MockD365Client — offline reference implementation
@@ -263,14 +298,24 @@ pub struct MockD365Client {
 }
 
 pub(crate) struct MockEntity {
-    structure: EntityStructure,
+    pub(crate) structure: EntityStructure,
     rows: Vec<serde_json::Map<String, serde_json::Value>>,
+}
+
+/// The curated entity structures, shared by the mock and the live HTTP client
+/// (the live client serves metadata/structure from this catalogue so the
+/// read-only safety annotations stay stable, and hits the network for data).
+pub(crate) fn seed_entity_structures() -> Vec<EntityStructure> {
+    seed_entities().into_iter().map(|e| e.structure).collect()
 }
 
 impl MockD365Client {
     pub fn new(pool_size: usize, identity: serde_json::Value) -> Arc<Self> {
-        let legal_entity = identity.get("legal_entity")
-            .and_then(|v| v.as_str()).unwrap_or("USMF").to_string();
+        let legal_entity = identity
+            .get("legal_entity")
+            .and_then(|v| v.as_str())
+            .unwrap_or("USMF")
+            .to_string();
         let mut s = Self {
             pool: ConnectionPool::new(pool_size),
             operations: HashMap::new(),
@@ -278,8 +323,12 @@ impl MockD365Client {
             identity,
             legal_entity,
         };
-        for op in seed_operations() { s.operations.insert(op.operation.clone(), op); }
-        for e in seed_entities() { s.entities.insert(e.structure.entity.clone(), e); }
+        for op in seed_operations() {
+            s.operations.insert(op.operation.clone(), op);
+        }
+        for e in seed_entities() {
+            s.entities.insert(e.structure.entity.clone(), e);
+        }
         Arc::new(s)
     }
 }
@@ -303,12 +352,20 @@ impl D365Client for MockD365Client {
         let _p = self.pool.acquire().await?;
         let q = query.to_lowercase();
         let terms: Vec<&str> = q.split_whitespace().collect();
-        let mut hits: Vec<ServiceSummary> = self.operations.values()
+        let mut hits: Vec<ServiceSummary> = self
+            .operations
+            .values()
             .filter_map(|f| {
-                let hay = format!("{} {} {}", f.operation.to_lowercase(), f.description.to_lowercase(), f.service_group.to_lowercase());
+                let hay = format!(
+                    "{} {} {}",
+                    f.operation.to_lowercase(),
+                    f.description.to_lowercase(),
+                    f.service_group.to_lowercase()
+                );
                 let score: usize = terms.iter().map(|t| hay.matches(t).count()).sum();
-                if score == 0 { None }
-                else {
+                if score == 0 {
+                    None
+                } else {
                     Some(ServiceSummary {
                         operation: f.operation.clone(),
                         description: f.description.clone(),
@@ -319,19 +376,35 @@ impl D365Client for MockD365Client {
                 }
             })
             .collect();
-        hits.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        hits.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         hits.truncate(limit.max(1));
-        Ok(ServiceSearchResult { query: query.into(), hits })
+        Ok(ServiceSearchResult {
+            query: query.into(),
+            hits,
+        })
     }
 
-    async fn service_metadata(&self, operation: &str, _language: &str) -> D365Result<ServiceOperationMeta> {
+    async fn service_metadata(
+        &self,
+        operation: &str,
+        _language: &str,
+    ) -> D365Result<ServiceOperationMeta> {
         let _p = self.pool.acquire().await?;
-        self.operations.get(operation)
+        self.operations
+            .get(operation)
             .cloned()
             .ok_or_else(|| D365Error::NotFound(operation.into()))
     }
 
-    async fn bulk_service_metadata(&self, operations: &[String], language: &str) -> D365Result<BulkMetadata> {
+    async fn bulk_service_metadata(
+        &self,
+        operations: &[String],
+        language: &str,
+    ) -> D365Result<BulkMetadata> {
         let _p = self.pool.acquire().await?;
         let mut out = Vec::new();
         let mut missing = Vec::new();
@@ -341,12 +414,22 @@ impl D365Client for MockD365Client {
                 None => missing.push(f.clone()),
             }
         }
-        Ok(BulkMetadata { language: language.into(), operations: out, missing })
+        Ok(BulkMetadata {
+            language: language.into(),
+            operations: out,
+            missing,
+        })
     }
 
-    async fn call_service(&self, request: ServiceCallRequest, read_only_mode: bool) -> D365Result<serde_json::Value> {
+    async fn call_service(
+        &self,
+        request: ServiceCallRequest,
+        read_only_mode: bool,
+    ) -> D365Result<serde_json::Value> {
         let _p = self.pool.acquire().await?;
-        let meta = self.operations.get(&request.operation)
+        let meta = self
+            .operations
+            .get(&request.operation)
             .ok_or_else(|| D365Error::NotFound(request.operation.clone()))?;
         if read_only_mode && !meta.read_only {
             return Err(D365Error::PermissionDenied(format!(
@@ -358,10 +441,12 @@ impl D365Client for MockD365Client {
         let args = match &request.parameters {
             serde_json::Value::Object(m) => m.clone(),
             serde_json::Value::Null => serde_json::Map::new(),
-            other => return Err(D365Error::InvalidParameter {
-                name: "parameters".into(),
-                reason: format!("expected object, got {}", other),
-            }),
+            other => {
+                return Err(D365Error::InvalidParameter {
+                    name: "parameters".into(),
+                    reason: format!("expected object, got {}", other),
+                })
+            }
         };
         for p in &meta.parameters {
             if p.direction == ParamDirection::In && !p.optional && !args.contains_key(&p.name) {
@@ -395,14 +480,26 @@ impl D365Client for MockD365Client {
                 max_rows: request.max_rows,
             });
         }
-        let entity = self.entities.get(&request.entity)
+        let entity = self
+            .entities
+            .get(&request.entity)
             .ok_or_else(|| D365Error::NotFound(request.entity.clone()))?;
 
         let projection: Vec<String> = if request.fields.is_empty() {
-            entity.structure.fields.iter().map(|f| f.name.clone()).collect()
+            entity
+                .structure
+                .fields
+                .iter()
+                .map(|f| f.name.clone())
+                .collect()
         } else {
             for f in &request.fields {
-                if !entity.structure.fields.iter().any(|tf| tf.name.eq_ignore_ascii_case(f)) {
+                if !entity
+                    .structure
+                    .fields
+                    .iter()
+                    .any(|tf| tf.name.eq_ignore_ascii_case(f))
+                {
                     return Err(D365Error::InvalidParameter {
                         name: "fields".into(),
                         reason: format!("unknown field '{f}'"),
@@ -419,7 +516,8 @@ impl D365Client for MockD365Client {
         // restrict to the connection's legal entity so cross-company leaks
         // are impossible by construction.
         if entity.structure.company_scoped {
-            let has_company_filter = conditions.iter()
+            let has_company_filter = conditions
+                .iter()
                 .any(|(f, _, _)| f.eq_ignore_ascii_case(COMPANY_FIELD));
             if !has_company_filter {
                 conditions.push((COMPANY_FIELD.into(), "=".into(), self.legal_entity.clone()));
@@ -428,12 +526,22 @@ impl D365Client for MockD365Client {
 
         let mut rows: Vec<EntityRow> = Vec::new();
         for row in &entity.rows {
-            if conditions.iter().all(|(field, op, value)| match_row(row, field, op, value)) {
-                let projected: serde_json::Map<String, serde_json::Value> = projection.iter()
-                    .filter_map(|f| row.iter().find(|(k, _)| k.eq_ignore_ascii_case(f)).map(|(k, v)| (k.clone(), v.clone())))
+            if conditions
+                .iter()
+                .all(|(field, op, value)| match_row(row, field, op, value))
+            {
+                let projected: serde_json::Map<String, serde_json::Value> = projection
+                    .iter()
+                    .filter_map(|f| {
+                        row.iter()
+                            .find(|(k, _)| k.eq_ignore_ascii_case(f))
+                            .map(|(k, v)| (k.clone(), v.clone()))
+                    })
                     .collect();
                 rows.push(EntityRow { values: projected });
-                if rows.len() >= request.max_rows { break; }
+                if rows.len() >= request.max_rows {
+                    break;
+                }
             }
         }
         Ok(rows)
@@ -441,21 +549,31 @@ impl D365Client for MockD365Client {
 
     async fn entity_structure(&self, entity: &str) -> D365Result<EntityStructure> {
         let _p = self.pool.acquire().await?;
-        self.entities.get(entity)
+        self.entities
+            .get(entity)
             .map(|t| t.structure.clone())
             .ok_or_else(|| D365Error::NotFound(entity.into()))
     }
 
     fn pool_status(&self) -> PoolStatus {
-        PoolStatus { cap: self.pool.cap(), available: self.pool.available() }
+        PoolStatus {
+            cap: self.pool.cap(),
+            available: self.pool.available(),
+        }
     }
 }
 
-fn mock_outputs(meta: &ServiceOperationMeta, _args: &serde_json::Map<String, serde_json::Value>) -> serde_json::Value {
+fn mock_outputs(
+    meta: &ServiceOperationMeta,
+    _args: &serde_json::Map<String, serde_json::Value>,
+) -> serde_json::Value {
     let mut out = serde_json::Map::new();
     for p in &meta.parameters {
         if p.direction == ParamDirection::Out {
-            out.insert(p.name.clone(), serde_json::Value::String(format!("<mock {}>", p.type_token)));
+            out.insert(
+                p.name.clone(),
+                serde_json::Value::String(format!("<mock {}>", p.type_token)),
+            );
         }
     }
     serde_json::Value::Object(out)
@@ -469,15 +587,29 @@ fn parse_conditions(raw: &[String]) -> D365Result<Vec<(String, String, String)>>
         let trimmed = s.trim();
         let upper = trimmed.to_uppercase();
         let (field, op, val) = if let Some(idx) = upper.find(" LIKE ") {
-            (trimmed[..idx].trim().to_string(), "LIKE".to_string(), strip_val(&trimmed[idx + 6..]))
+            (
+                trimmed[..idx].trim().to_string(),
+                "LIKE".to_string(),
+                strip_val(&trimmed[idx + 6..]),
+            )
         } else if let Some(idx) = upper.find(" EQ ") {
-            (trimmed[..idx].trim().to_string(), "=".to_string(), strip_val(&trimmed[idx + 4..]))
+            (
+                trimmed[..idx].trim().to_string(),
+                "=".to_string(),
+                strip_val(&trimmed[idx + 4..]),
+            )
         } else if let Some(idx) = trimmed.find('=') {
-            (trimmed[..idx].trim().to_string(), "=".to_string(), strip_val(&trimmed[idx + 1..]))
+            (
+                trimmed[..idx].trim().to_string(),
+                "=".to_string(),
+                strip_val(&trimmed[idx + 1..]),
+            )
         } else {
             return Err(D365Error::InvalidParameter {
                 name: "filters".into(),
-                reason: format!("unsupported clause '{s}' (expected Field eq 'value' or Field like 'pattern')"),
+                reason: format!(
+                    "unsupported clause '{s}' (expected Field eq 'value' or Field like 'pattern')"
+                ),
             });
         };
         out.push((field, op, val));
@@ -489,8 +621,14 @@ fn strip_val(s: &str) -> String {
     s.trim().trim_matches('\'').to_string()
 }
 
-fn match_row(row: &serde_json::Map<String, serde_json::Value>, field: &str, op: &str, value: &str) -> bool {
-    let actual = row.iter()
+fn match_row(
+    row: &serde_json::Map<String, serde_json::Value>,
+    field: &str,
+    op: &str,
+    value: &str,
+) -> bool {
+    let actual = row
+        .iter()
         .find(|(k, _)| k.eq_ignore_ascii_case(field))
         .map(|(_, v)| match v {
             serde_json::Value::String(s) => s.clone(),
@@ -507,7 +645,9 @@ fn match_row(row: &serde_json::Map<String, serde_json::Value>, field: &str, op: 
 fn sql_like(haystack: &str, pattern: &str) -> bool {
     let h = haystack.to_lowercase();
     let p = pattern.to_lowercase();
-    if !p.contains('%') && !p.contains('_') { return h == p; }
+    if !p.contains('%') && !p.contains('_') {
+        return h == p;
+    }
     let stripped = p.replace('_', "");
     if let Some(rest) = stripped.strip_prefix('%') {
         let rest = rest.strip_suffix('%').unwrap_or(rest);
@@ -529,10 +669,32 @@ fn sql_like(haystack: &str, pattern: &str) -> bool {
 // stages operations into an OData `$batch` change set and submits atomically.
 
 fn p_in(name: &str, ty: &str, opt: bool, desc: &str) -> ServiceParameter {
-    ServiceParameter { name: name.into(), direction: ParamDirection::In, type_token: ty.into(), optional: opt, description: if desc.is_empty() { None } else { Some(desc.into()) }, default_value: None }
+    ServiceParameter {
+        name: name.into(),
+        direction: ParamDirection::In,
+        type_token: ty.into(),
+        optional: opt,
+        description: if desc.is_empty() {
+            None
+        } else {
+            Some(desc.into())
+        },
+        default_value: None,
+    }
 }
 fn p_out(name: &str, ty: &str, desc: &str) -> ServiceParameter {
-    ServiceParameter { name: name.into(), direction: ParamDirection::Out, type_token: ty.into(), optional: false, description: if desc.is_empty() { None } else { Some(desc.into()) }, default_value: None }
+    ServiceParameter {
+        name: name.into(),
+        direction: ParamDirection::Out,
+        type_token: ty.into(),
+        optional: false,
+        description: if desc.is_empty() {
+            None
+        } else {
+            Some(desc.into())
+        },
+        default_value: None,
+    }
 }
 
 pub(crate) fn seed_operations() -> Vec<ServiceOperationMeta> {
@@ -650,11 +812,25 @@ pub(crate) fn seed_operations() -> Vec<ServiceOperationMeta> {
 }
 
 fn field(name: &str, edm: &str, ty: &str, len: u32, key: bool, desc: &str) -> EntityField {
-    EntityField { name: name.into(), edm_type: edm.into(), type_token: ty.into(), length: len, description: if desc.is_empty() { None } else { Some(desc.into()) }, key }
+    EntityField {
+        name: name.into(),
+        edm_type: edm.into(),
+        type_token: ty.into(),
+        length: len,
+        description: if desc.is_empty() {
+            None
+        } else {
+            Some(desc.into())
+        },
+        key,
+    }
 }
 
 fn row(pairs: &[(&str, serde_json::Value)]) -> serde_json::Map<String, serde_json::Value> {
-    pairs.iter().map(|(k, v)| (k.to_string(), v.clone())).collect()
+    pairs
+        .iter()
+        .map(|(k, v)| (k.to_string(), v.clone()))
+        .collect()
 }
 
 pub(crate) fn seed_entities() -> Vec<MockEntity> {
@@ -811,7 +987,9 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    fn identity() -> serde_json::Value { json!({ "legal_entity": "USMF" }) }
+    fn identity() -> serde_json::Value {
+        json!({ "legal_entity": "USMF" })
+    }
 
     #[tokio::test]
     async fn environment_info_reports_legal_entity() {
@@ -825,42 +1003,65 @@ mod tests {
     async fn search_finds_ledger_post() {
         let c = MockD365Client::new(2, identity());
         let res = c.search_service("ledger journal post", 5).await.unwrap();
-        assert!(res.hits.iter().any(|h| h.operation == "LedgerGeneralJournalEntryPost"));
+        assert!(res
+            .hits
+            .iter()
+            .any(|h| h.operation == "LedgerGeneralJournalEntryPost"));
     }
 
     #[tokio::test]
     async fn read_entity_injects_company_scope() {
         let c = MockD365Client::new(2, identity());
         // No filter given; company-scoped entity must restrict to USMF only.
-        let rows = c.read_entity(ReadEntityRequest {
-            entity: "FiscalCalendarPeriod".into(),
-            fields: vec![],
-            filters: vec![],
-            max_rows: 100,
-        }).await.unwrap();
+        let rows = c
+            .read_entity(ReadEntityRequest {
+                entity: "FiscalCalendarPeriod".into(),
+                fields: vec![],
+                filters: vec![],
+                max_rows: 100,
+            })
+            .await
+            .unwrap();
         assert!(!rows.is_empty());
-        assert!(rows.iter().all(|r| r.values.get("dataAreaId").and_then(|v| v.as_str()) == Some("USMF")));
+        assert!(rows
+            .iter()
+            .all(|r| r.values.get("dataAreaId").and_then(|v| v.as_str()) == Some("USMF")));
     }
 
     #[tokio::test]
     async fn read_only_mode_blocks_write_operation() {
         let c = MockD365Client::new(2, identity());
-        let err = c.call_service(ServiceCallRequest {
-            operation: "LedgerGeneralJournalEntryPost".into(),
-            parameters: json!({ "JournalBatchNumber": "000123", "JournalLines": [] }),
-            timeout_ms: 1000,
-            require_read_only_safe: true,
-        }, true).await.unwrap_err();
+        let err = c
+            .call_service(
+                ServiceCallRequest {
+                    operation: "LedgerGeneralJournalEntryPost".into(),
+                    parameters: json!({ "JournalBatchNumber": "000123", "JournalLines": [] }),
+                    timeout_ms: 1000,
+                    require_read_only_safe: true,
+                },
+                true,
+            )
+            .await
+            .unwrap_err();
         assert!(matches!(err, D365Error::PermissionDenied(_)), "got {err:?}");
     }
 
     #[tokio::test]
     async fn over_cap_read_is_query_overflow() {
         let c = MockD365Client::new(2, identity());
-        let err = c.read_entity(ReadEntityRequest {
-            entity: "CompaniesV2".into(), fields: vec![], filters: vec![], max_rows: 5000,
-        }).await.unwrap_err();
-        assert!(matches!(err, D365Error::QueryResultOverflow { .. }), "got {err:?}");
+        let err = c
+            .read_entity(ReadEntityRequest {
+                entity: "CompaniesV2".into(),
+                fields: vec![],
+                filters: vec![],
+                max_rows: 5000,
+            })
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(err, D365Error::QueryResultOverflow { .. }),
+            "got {err:?}"
+        );
     }
 
     // ---- Dynamics 365 correctness invariants (ported from SAP_CORRECTNESS) ----
@@ -869,8 +1070,11 @@ mod tests {
     fn every_write_operation_uses_changeset() {
         for op in seed_operations() {
             if !op.read_only {
-                assert!(op.uses_changeset,
-                    "write operation '{}' must be submitted inside a $batch change set", op.operation);
+                assert!(
+                    op.uses_changeset,
+                    "write operation '{}' must be submitted inside a $batch change set",
+                    op.operation
+                );
             }
         }
     }
@@ -881,10 +1085,14 @@ mod tests {
         // every write operation must surface an Infolog / status output.
         for op in seed_operations() {
             if !op.read_only {
-                let has_status = op.parameters.iter().any(|p|
-                    p.direction == ParamDirection::Out && p.name.eq_ignore_ascii_case("Infolog"));
-                assert!(has_status,
-                    "write operation '{}' must return an Infolog status output", op.operation);
+                let has_status = op.parameters.iter().any(|p| {
+                    p.direction == ParamDirection::Out && p.name.eq_ignore_ascii_case("Infolog")
+                });
+                assert!(
+                    has_status,
+                    "write operation '{}' must return an Infolog status output",
+                    op.operation
+                );
             }
         }
     }
@@ -892,8 +1100,11 @@ mod tests {
     #[test]
     fn every_operation_references_a_security_privilege() {
         for op in seed_operations() {
-            assert!(!op.security.is_empty(),
-                "operation '{}' must declare at least one security privilege", op.operation);
+            assert!(
+                !op.security.is_empty(),
+                "operation '{}' must declare at least one security privilege",
+                op.operation
+            );
         }
     }
 
@@ -901,32 +1112,53 @@ mod tests {
     fn every_company_scoped_entity_has_dataareaid_key() {
         for e in seed_entities() {
             if e.structure.company_scoped {
-                assert!(e.structure.key_fields.iter().any(|k| k == COMPANY_FIELD),
-                    "company-scoped entity '{}' must carry dataAreaId as a key field", e.structure.entity);
+                assert!(
+                    e.structure.key_fields.iter().any(|k| k == COMPANY_FIELD),
+                    "company-scoped entity '{}' must carry dataAreaId as a key field",
+                    e.structure.entity
+                );
             }
         }
     }
 
     #[test]
     fn item_number_follows_released_product_convention() {
-        let rp = seed_entities().into_iter().find(|e| e.structure.entity == "ReleasedProductsV2").unwrap();
+        let rp = seed_entities()
+            .into_iter()
+            .find(|e| e.structure.entity == "ReleasedProductsV2")
+            .unwrap();
         assert!(rp.structure.fields.iter().any(|f| f.name == "ItemNumber" && f.type_token == "ItemId"),
             "ReleasedProductsV2 must key on ItemNumber (ItemId), the Dynamics 365 replacement for SAP MATNR");
     }
 
     #[test]
     fn general_journal_account_entry_is_the_subledger_truth() {
-        let gjae = seed_entities().into_iter().find(|e| e.structure.entity == "GeneralJournalAccountEntry");
+        let gjae = seed_entities()
+            .into_iter()
+            .find(|e| e.structure.entity == "GeneralJournalAccountEntry");
         let gjae = gjae.expect("GeneralJournalAccountEntry must be present");
-        assert!(gjae.structure.legacy_mapping.as_deref().unwrap_or("").contains("universal journal"),
-            "GeneralJournalAccountEntry must be marked as the universal-journal source of truth");
+        assert!(
+            gjae.structure
+                .legacy_mapping
+                .as_deref()
+                .unwrap_or("")
+                .contains("universal journal"),
+            "GeneralJournalAccountEntry must be marked as the universal-journal source of truth"
+        );
     }
 
     #[test]
     fn legacy_tables_map_to_data_entities() {
         // BSEG → LedgerJournalTrans, ACDOCA → GeneralJournalAccountEntry, etc.
-        for name in ["LedgerJournalTrans", "GeneralJournalAccountEntry", "ReleasedProductsV2"] {
-            let e = seed_entities().into_iter().find(|e| e.structure.entity == name).unwrap();
+        for name in [
+            "LedgerJournalTrans",
+            "GeneralJournalAccountEntry",
+            "ReleasedProductsV2",
+        ] {
+            let e = seed_entities()
+                .into_iter()
+                .find(|e| e.structure.entity == name)
+                .unwrap();
             assert!(e.structure.legacy_mapping.is_some(),
                 "entity '{name}' should carry a SAP→Dynamics 365 mapping note for migrating operators");
         }

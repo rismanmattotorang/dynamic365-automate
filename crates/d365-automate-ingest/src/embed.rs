@@ -47,19 +47,28 @@ pub struct MockEmbedder {
 }
 
 impl MockEmbedder {
-    pub fn new(dim: usize) -> Self { Self { dim } }
+    pub fn new(dim: usize) -> Self {
+        Self { dim }
+    }
 }
 
 impl Default for MockEmbedder {
-    fn default() -> Self { Self::new(256) }
+    fn default() -> Self {
+        Self::new(256)
+    }
 }
 
 #[async_trait]
 impl EmbeddingClient for MockEmbedder {
-    fn dim(&self) -> usize { self.dim }
+    fn dim(&self) -> usize {
+        self.dim
+    }
 
     async fn embed(&self, texts: &[String]) -> Result<Vec<Vec<f32>>, EmbeddingError> {
-        Ok(texts.iter().map(|t| token_bag_vector(t, self.dim)).collect())
+        Ok(texts
+            .iter()
+            .map(|t| token_bag_vector(t, self.dim))
+            .collect())
     }
 }
 
@@ -76,7 +85,9 @@ fn token_bag_vector(text: &str, dim: usize) -> Vec<f32> {
         v[bucket] += 1.0;
     }
     let norm = v.iter().map(|x| x * x).sum::<f32>().sqrt().max(1e-9);
-    for x in &mut v { *x /= norm; }
+    for x in &mut v {
+        *x /= norm;
+    }
     v
 }
 
@@ -142,12 +153,19 @@ struct EmbedDatum {
 
 #[async_trait]
 impl EmbeddingClient for OpenAiEmbedder {
-    fn dim(&self) -> usize { self.dim }
+    fn dim(&self) -> usize {
+        self.dim
+    }
 
     async fn embed(&self, texts: &[String]) -> Result<Vec<Vec<f32>>, EmbeddingError> {
         let url = format!("{}/embeddings", self.base_url);
-        let body = EmbedRequest { input: texts, model: &self.model };
-        let resp = self.http.post(&url)
+        let body = EmbedRequest {
+            input: texts,
+            model: &self.model,
+        };
+        let resp = self
+            .http
+            .post(&url)
             .bearer_auth(&self.api_key)
             .json(&body)
             .send()
@@ -157,13 +175,18 @@ impl EmbeddingClient for OpenAiEmbedder {
             let s = resp.text().await.unwrap_or_default();
             return Err(EmbeddingError::Api(s));
         }
-        let parsed: EmbedResponse = resp.json().await.map_err(|e| EmbeddingError::Malformed(e.to_string()))?;
+        let parsed: EmbedResponse = resp
+            .json()
+            .await
+            .map_err(|e| EmbeddingError::Malformed(e.to_string()))?;
         debug!(count = parsed.data.len(), "openai embed ok");
         let mut out: Vec<Vec<f32>> = parsed.data.into_iter().map(|d| d.embedding).collect();
         for v in &mut out {
             if v.len() != self.dim {
                 return Err(EmbeddingError::Malformed(format!(
-                    "expected dim {}, got {}", self.dim, v.len(),
+                    "expected dim {}, got {}",
+                    self.dim,
+                    v.len(),
                 )));
             }
         }
@@ -178,16 +201,22 @@ mod tests {
     #[tokio::test]
     async fn mock_embedder_similarity() {
         let e = MockEmbedder::new(128);
-        let v = e.embed(&[
-            "period close in Dynamics 365 Finance".into(),
-            "period-end close Finance module".into(),
-            "product receipt SupplyChain posting".into(),
-        ]).await.unwrap();
+        let v = e
+            .embed(&[
+                "period close in Dynamics 365 Finance".into(),
+                "period-end close Finance module".into(),
+                "product receipt SupplyChain posting".into(),
+            ])
+            .await
+            .unwrap();
         let cos = |a: &Vec<f32>, b: &Vec<f32>| -> f32 {
             a.iter().zip(b.iter()).map(|(x, y)| x * y).sum::<f32>()
         };
         // First two share more vocabulary than first and third.
-        assert!(cos(&v[0], &v[1]) > cos(&v[0], &v[2]), "expected nearer cosine");
+        assert!(
+            cos(&v[0], &v[1]) > cos(&v[0], &v[2]),
+            "expected nearer cosine"
+        );
     }
 
     #[tokio::test]

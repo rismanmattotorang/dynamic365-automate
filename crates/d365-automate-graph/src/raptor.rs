@@ -35,7 +35,11 @@ pub struct RaptorTree {
 impl RaptorTree {
     /// Return the leaves (level 0).
     pub fn leaves(&self) -> &[RaptorNode] {
-        self.levels.iter().find(|l| l.level == 0).map(|l| l.nodes.as_slice()).unwrap_or(&[])
+        self.levels
+            .iter()
+            .find(|l| l.level == 0)
+            .map(|l| l.nodes.as_slice())
+            .unwrap_or(&[])
     }
     /// Return the highest summary level.
     pub fn root(&self) -> Option<&RaptorLevel> {
@@ -53,44 +57,76 @@ pub fn build_raptor_tree(g: &InMemoryGraph, communities: &Communities) -> Raptor
     let mut levels = Vec::new();
 
     // L0 — leaves
-    let leaves: Vec<RaptorNode> = g.nodes().map(|e: &Entity| RaptorNode {
-        id: format!("leaf:{}", e.id),
+    let leaves: Vec<RaptorNode> = g
+        .nodes()
+        .map(|e: &Entity| RaptorNode {
+            id: format!("leaf:{}", e.id),
+            level: 0,
+            summary: format!("{} — {}", e.label, e.description.as_deref().unwrap_or("")),
+            members: vec![e.id.clone()],
+        })
+        .collect();
+    levels.push(RaptorLevel {
         level: 0,
-        summary: format!("{} — {}", e.label, e.description.as_deref().unwrap_or("")),
-        members: vec![e.id.clone()],
-    }).collect();
-    levels.push(RaptorLevel { level: 0, nodes: leaves });
+        nodes: leaves,
+    });
 
     // L1 — one node per community
-    let l1: Vec<RaptorNode> = communities.communities.iter().map(|c| RaptorNode {
-        id: format!("community:{}", c.id),
+    let l1: Vec<RaptorNode> = communities
+        .communities
+        .iter()
+        .map(|c| RaptorNode {
+            id: format!("community:{}", c.id),
+            level: 1,
+            summary: format!(
+                "Community #{} ({} members): {}",
+                c.id,
+                c.members.len(),
+                c.summary
+            ),
+            members: c.members.clone(),
+        })
+        .collect();
+    levels.push(RaptorLevel {
         level: 1,
-        summary: format!("Community #{} ({} members): {}", c.id, c.members.len(), c.summary),
-        members: c.members.clone(),
-    }).collect();
-    levels.push(RaptorLevel { level: 1, nodes: l1 });
+        nodes: l1,
+    });
 
     // L2 — module roll-ups (FI / MM / SD / HCM, plus a catch-all).
     let mut module_groups: HashMap<String, Vec<NodeId>> = HashMap::new();
     for e in g.nodes() {
-        let module = e.tags.iter()
+        let module = e
+            .tags
+            .iter()
             .find(|t| t.starts_with("module:"))
             .map(|t| t["module:".len()..].to_string())
             .unwrap_or_else(|| "other".into());
         module_groups.entry(module).or_default().push(e.id.clone());
     }
-    let l2: Vec<RaptorNode> = module_groups.into_iter().map(|(module, members)| {
-        let labels: Vec<String> = members.iter()
-            .filter_map(|m| g.node(m).map(|e| e.label.clone()))
-            .collect();
-        RaptorNode {
-            id: format!("module:{}", module),
-            level: 2,
-            summary: format!("Module {}: {} entities — {}", module.to_uppercase(), members.len(), labels.join(", ")),
-            members,
-        }
-    }).collect();
-    levels.push(RaptorLevel { level: 2, nodes: l2 });
+    let l2: Vec<RaptorNode> = module_groups
+        .into_iter()
+        .map(|(module, members)| {
+            let labels: Vec<String> = members
+                .iter()
+                .filter_map(|m| g.node(m).map(|e| e.label.clone()))
+                .collect();
+            RaptorNode {
+                id: format!("module:{}", module),
+                level: 2,
+                summary: format!(
+                    "Module {}: {} entities — {}",
+                    module.to_uppercase(),
+                    members.len(),
+                    labels.join(", ")
+                ),
+                members,
+            }
+        })
+        .collect();
+    levels.push(RaptorLevel {
+        level: 2,
+        nodes: l2,
+    });
 
     RaptorTree { levels }
 }

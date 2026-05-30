@@ -19,18 +19,19 @@ SAP→Dynamics 365 conceptual mapping, and the tool crosswalk live in
 | 6 | Web UI (Next.js) | ✅ Done |
 | 7 | Deploy & CI | ✅ Done |
 | 8 | Skills & docs | ✅ Done |
-| 3b | Live HTTP transports (`http` feature) | ⏳ Planned |
+| 3b | Live HTTP transports (`http` feature) | ✅ Done |
+
+All eight phases plus the live HTTP transports (3b) are complete.
+`HttpD365Client` and `HttpMetadataClient` ship behind the `http` feature; the
+server connects to a live environment when configured (see
+[`INTEGRATION.md`](INTEGRATION.md)).
 
 ## Next
 
-### Phase 3b — live transports
-- `HttpD365Client`: F&O OData v4 + Custom Service + atomic `$batch` change sets
-  over Microsoft Entra ID OAuth2 (token cache, retry/circuit-breaker reuse).
-- Live Metadata API client (`DataEntities`, `EntityMetadatas`, cross-reference).
-- Connection-file loaders + live integration tests that skip without `D365_*`
-  secrets. See [`INTEGRATION.md`](INTEGRATION.md).
-
-### Beyond
+- Multi-operation atomic `$batch` change sets (today a single OData action POST
+  is atomic server-side; multi-op change-set batching is the follow-up).
+- Live integration tests against a developer environment, gated on `D365_*`
+  secrets so CI without secrets skips cleanly.
 - ONNX cross-encoder reranker slot (replace `MockReranker`).
 - Real embedding provider wiring (Azure OpenAI / text-embedding-3-large).
 - Power Platform connector parity (Dataverse solutions, Power Automate flows).

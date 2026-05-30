@@ -11,8 +11,6 @@
 //! `MetadataClient`, one `RagEngine`, one `EmbeddingClient`.
 
 use crate::context::ServerContext;
-use mcp_core::{CallToolResult, ToolContent, ToolInputSchema};
-use mcp_server::{registry::ToolFn, ToolDescriptor};
 use d365_automate_kb::Domain;
 use d365_automate_meta::{
     CrossReferenceRequest, DeployRequest, MetaCallContext, MetaSearchRequest, XppObjectKind,
@@ -23,6 +21,8 @@ use d365_automate_odata::{
     MAX_ROWS_HARD_CAP,
 };
 use d365_automate_rag::Query;
+use mcp_core::{CallToolResult, ToolContent, ToolInputSchema};
+use mcp_server::{registry::ToolFn, ToolDescriptor};
 use serde::Deserialize;
 use std::sync::Arc;
 use std::time::Instant;
@@ -33,10 +33,30 @@ use std::time::Instant;
 
 pub fn rag_tools(ctx: &Arc<ServerContext>) -> Vec<ToolDescriptor> {
     vec![
-        make_rag_tool(ctx, "xpp.search", "Hybrid search over the X++ source corpus.", Domain::Xpp),
-        make_rag_tool(ctx, "flow.find_process", "Search the Power Automate / business-process repository.", Domain::Flow),
-        make_rag_tool(ctx, "app.search_solutions", "Search the Dataverse solution / module fact sheets.", Domain::Solution),
-        make_rag_tool(ctx, "d365.learn.search", "Search the Microsoft Learn corpus.", Domain::Learn),
+        make_rag_tool(
+            ctx,
+            "xpp.search",
+            "Hybrid search over the X++ source corpus.",
+            Domain::Xpp,
+        ),
+        make_rag_tool(
+            ctx,
+            "flow.find_process",
+            "Search the Power Automate / business-process repository.",
+            Domain::Flow,
+        ),
+        make_rag_tool(
+            ctx,
+            "app.search_solutions",
+            "Search the Dataverse solution / module fact sheets.",
+            Domain::Solution,
+        ),
+        make_rag_tool(
+            ctx,
+            "d365.learn.search",
+            "Search the Microsoft Learn corpus.",
+            Domain::Learn,
+        ),
         tool_kb_navigate(ctx),
     ]
 }
@@ -49,7 +69,9 @@ struct KbNavigateArgs {
     #[serde(default = "default_navigate_depth")]
     depth: u32,
 }
-fn default_navigate_depth() -> u32 { 1 }
+fn default_navigate_depth() -> u32 {
+    1
+}
 
 fn tool_kb_navigate(ctx: &Arc<ServerContext>) -> ToolDescriptor {
     let ctx = Arc::clone(ctx);
@@ -58,12 +80,21 @@ fn tool_kb_navigate(ctx: &Arc<ServerContext>) -> ToolDescriptor {
         async move {
             let args: KbNavigateArgs = match serde_json::from_value(arguments) {
                 Ok(a) => a,
-                Err(e) => return Ok(CallToolResult::error(format!("d365.kb.navigate: invalid arguments: {e}"))),
+                Err(e) => {
+                    return Ok(CallToolResult::error(format!(
+                        "d365.kb.navigate: invalid arguments: {e}"
+                    )))
+                }
             };
             let store = ctx.rag.store();
             let tree = match store.get_document_tree(&args.document_id).await {
                 Ok(Some(t)) => t,
-                Ok(None) => return Ok(CallToolResult::error(format!("d365.kb.navigate: document '{}' not found", args.document_id))),
+                Ok(None) => {
+                    return Ok(CallToolResult::error(format!(
+                        "d365.kb.navigate: document '{}' not found",
+                        args.document_id
+                    )))
+                }
                 Err(e) => return Ok(CallToolResult::error(format!("d365.kb.navigate: {e}"))),
             };
             let path = args.path.as_deref().unwrap_or("");
@@ -79,12 +110,15 @@ fn tool_kb_navigate(ctx: &Arc<ServerContext>) -> ToolDescriptor {
                 }
             };
             let view = serialize_node_bounded(node, args.depth);
-            render_json("d365.kb.navigate", &serde_json::json!({
-                "document_id": tree.document_id,
-                "max_depth": tree.max_depth,
-                "leaf_count": tree.leaf_count,
-                "node": view,
-            }))
+            render_json(
+                "d365.kb.navigate",
+                &serde_json::json!({
+                    "document_id": tree.document_id,
+                    "max_depth": tree.max_depth,
+                    "leaf_count": tree.leaf_count,
+                    "node": view,
+                }),
+            )
         }
     });
     ToolDescriptor::new(
@@ -106,12 +140,20 @@ fn tool_kb_navigate(ctx: &Arc<ServerContext>) -> ToolDescriptor {
 
 fn serialize_node_bounded(node: &d365_automate_kb::DocTreeNode, depth: u32) -> serde_json::Value {
     let children: Vec<serde_json::Value> = if depth == 0 {
-        node.children.iter().map(|c| serde_json::json!({
-            "path": c.path, "title": c.title, "summary": c.summary,
-            "approx_tokens": c.approx_tokens, "child_count": c.children.len(),
-        })).collect()
+        node.children
+            .iter()
+            .map(|c| {
+                serde_json::json!({
+                    "path": c.path, "title": c.title, "summary": c.summary,
+                    "approx_tokens": c.approx_tokens, "child_count": c.children.len(),
+                })
+            })
+            .collect()
     } else {
-        node.children.iter().map(|c| serialize_node_bounded(c, depth - 1)).collect()
+        node.children
+            .iter()
+            .map(|c| serialize_node_bounded(c, depth - 1))
+            .collect()
     };
     serde_json::json!({
         "path": node.path, "depth": node.depth, "title": node.title, "summary": node.summary,
@@ -126,7 +168,9 @@ struct RagSearchArgs {
     #[serde(default = "default_top_k")]
     top_k: usize,
 }
-fn default_top_k() -> usize { 5 }
+fn default_top_k() -> usize {
+    5
+}
 
 fn rag_search_schema() -> ToolInputSchema {
     ToolInputSchema::from_value(serde_json::json!({
@@ -140,7 +184,12 @@ fn rag_search_schema() -> ToolInputSchema {
     }))
 }
 
-fn make_rag_tool(ctx: &Arc<ServerContext>, name: &str, description: &str, domain: Domain) -> ToolDescriptor {
+fn make_rag_tool(
+    ctx: &Arc<ServerContext>,
+    name: &str,
+    description: &str,
+    domain: Domain,
+) -> ToolDescriptor {
     let ctx = Arc::clone(ctx);
     let tool_name = name.to_string();
     let handler = ToolFn(move |arguments: serde_json::Value| {
@@ -149,32 +198,63 @@ fn make_rag_tool(ctx: &Arc<ServerContext>, name: &str, description: &str, domain
         async move {
             let args: RagSearchArgs = match serde_json::from_value(arguments) {
                 Ok(a) => a,
-                Err(e) => return Ok(CallToolResult::error(format!("{tool_name}: invalid arguments: {e}"))),
+                Err(e) => {
+                    return Ok(CallToolResult::error(format!(
+                        "{tool_name}: invalid arguments: {e}"
+                    )))
+                }
             };
-            let q_vec = ctx.embedder.embed(std::slice::from_ref(&args.query)).await.ok().and_then(|mut v| v.pop());
-            let hits = ctx.rag.search(Query {
-                text: &args.query, domain: Some(domain), top_k: args.top_k, embedding: q_vec,
-            }).await;
+            let q_vec = ctx
+                .embedder
+                .embed(std::slice::from_ref(&args.query))
+                .await
+                .ok()
+                .and_then(|mut v| v.pop());
+            let hits = ctx
+                .rag
+                .search(Query {
+                    text: &args.query,
+                    domain: Some(domain),
+                    top_k: args.top_k,
+                    embedding: q_vec,
+                })
+                .await;
             match hits {
                 Err(e) => Ok(CallToolResult::error(format!("{tool_name}: {e}"))),
-                Ok(hits) if hits.is_empty() => {
-                    Ok(CallToolResult::text(format!("{tool_name}: no matches for \"{}\"", args.query)))
-                }
+                Ok(hits) if hits.is_empty() => Ok(CallToolResult::text(format!(
+                    "{tool_name}: no matches for \"{}\"",
+                    args.query
+                ))),
                 Ok(hits) => {
-                    let mut lines = vec![format!("{tool_name}: {} hit(s) for \"{}\"", hits.len(), args.query)];
+                    let mut lines = vec![format!(
+                        "{tool_name}: {} hit(s) for \"{}\"",
+                        hits.len(),
+                        args.query
+                    )];
                     for h in &hits {
                         lines.push(format!(
                             "- [{:?}] {} ({:.3}) — {}\n  uri: {}",
-                            h.layer, h.hit.chunk.title, h.hit.score,
-                            truncate(&h.hit.chunk.text, 160), h.hit.chunk.uri,
+                            h.layer,
+                            h.hit.chunk.title,
+                            h.hit.score,
+                            truncate(&h.hit.chunk.text, 160),
+                            h.hit.chunk.uri,
                         ));
                     }
-                    Ok(CallToolResult { content: vec![ToolContent::text(lines.join("\n"))], is_error: false })
+                    Ok(CallToolResult {
+                        content: vec![ToolContent::text(lines.join("\n"))],
+                        is_error: false,
+                    })
                 }
             }
         }
     });
-    ToolDescriptor::new(name, Some(description.into()), rag_search_schema(), Arc::new(handler))
+    ToolDescriptor::new(
+        name,
+        Some(description.into()),
+        rag_search_schema(),
+        Arc::new(handler),
+    )
 }
 
 // ===========================================================================
@@ -251,19 +331,28 @@ fn tool_cache_stats(ctx: &Arc<ServerContext>) -> ToolDescriptor {
             match &ctx.metadata_cache {
                 Some(cache) => {
                     let s = cache.stats().await;
-                    render_json("d365.env.cache_stats", &serde_json::json!({
-                        "hits": s.hits, "misses": s.misses, "entries": s.entries,
-                        "evictions": s.evictions, "hit_ratio": s.hit_ratio(),
-                    }))
+                    render_json(
+                        "d365.env.cache_stats",
+                        &serde_json::json!({
+                            "hits": s.hits, "misses": s.misses, "entries": s.entries,
+                            "evictions": s.evictions, "hit_ratio": s.hit_ratio(),
+                        }),
+                    )
                 }
-                None => Ok(CallToolResult::error("d365.env.cache_stats: metadata cache disabled")),
+                None => Ok(CallToolResult::error(
+                    "d365.env.cache_stats: metadata cache disabled",
+                )),
             }
         }
     });
-    ToolDescriptor::new("d365.env.cache_stats",
+    ToolDescriptor::new(
+        "d365.env.cache_stats",
         Some("Live hit/miss counters for the service-metadata cache. JSON.".into()),
-        ToolInputSchema::from_value(serde_json::json!({"type": "object", "additionalProperties": false})),
-        Arc::new(handler))
+        ToolInputSchema::from_value(
+            serde_json::json!({"type": "object", "additionalProperties": false}),
+        ),
+        Arc::new(handler),
+    )
 }
 
 fn tool_cache_invalidate(ctx: &Arc<ServerContext>) -> ToolDescriptor {
@@ -276,7 +365,9 @@ fn tool_cache_invalidate(ctx: &Arc<ServerContext>) -> ToolDescriptor {
                     cache.invalidate_all().await;
                     Ok(CallToolResult::text("metadata cache invalidated"))
                 }
-                None => Ok(CallToolResult::error("d365.env.cache_invalidate: metadata cache disabled")),
+                None => Ok(CallToolResult::error(
+                    "d365.env.cache_invalidate: metadata cache disabled",
+                )),
             }
         }
     });
@@ -287,8 +378,14 @@ fn tool_cache_invalidate(ctx: &Arc<ServerContext>) -> ToolDescriptor {
 }
 
 #[derive(Deserialize)]
-struct SearchArgs { query: String, #[serde(default = "default_limit_20")] limit: usize }
-fn default_limit_20() -> usize { 20 }
+struct SearchArgs {
+    query: String,
+    #[serde(default = "default_limit_20")]
+    limit: usize,
+}
+fn default_limit_20() -> usize {
+    20
+}
 
 fn tool_service_search(ctx: &Arc<ServerContext>) -> ToolDescriptor {
     let ctx = Arc::clone(ctx);
@@ -297,9 +394,17 @@ fn tool_service_search(ctx: &Arc<ServerContext>) -> ToolDescriptor {
         async move {
             let args: SearchArgs = match serde_json::from_value(arguments) {
                 Ok(a) => a,
-                Err(e) => return Ok(CallToolResult::error(format!("d365.service.search: invalid arguments: {e}"))),
+                Err(e) => {
+                    return Ok(CallToolResult::error(format!(
+                        "d365.service.search: invalid arguments: {e}"
+                    )))
+                }
             };
-            match ctx.d365_client.search_service(&args.query, args.limit).await {
+            match ctx
+                .d365_client
+                .search_service(&args.query, args.limit)
+                .await
+            {
                 Ok(r) => render_json("d365.service.search", &r),
                 Err(e) => Ok(CallToolResult::error(format!("d365.service.search: {e}"))),
             }
@@ -320,8 +425,14 @@ fn tool_service_search(ctx: &Arc<ServerContext>) -> ToolDescriptor {
 }
 
 #[derive(Deserialize)]
-struct MetaArgs { operation: String, #[serde(default = "default_lang")] language: String }
-fn default_lang() -> String { "en-us".into() }
+struct MetaArgs {
+    operation: String,
+    #[serde(default = "default_lang")]
+    language: String,
+}
+fn default_lang() -> String {
+    "en-us".into()
+}
 
 fn tool_service_metadata(ctx: &Arc<ServerContext>) -> ToolDescriptor {
     let ctx = Arc::clone(ctx);
@@ -330,11 +441,22 @@ fn tool_service_metadata(ctx: &Arc<ServerContext>) -> ToolDescriptor {
         async move {
             let args: MetaArgs = match serde_json::from_value(arguments) {
                 Ok(a) => a,
-                Err(e) => return Ok(CallToolResult::error(format!("d365.service.metadata: invalid arguments: {e}"))),
+                Err(e) => {
+                    return Ok(CallToolResult::error(format!(
+                        "d365.service.metadata: invalid arguments: {e}"
+                    )))
+                }
             };
-            match ctx.d365_client.service_metadata(&args.operation, &args.language).await {
+            match ctx
+                .d365_client
+                .service_metadata(&args.operation, &args.language)
+                .await
+            {
                 Ok(m) => render_json("d365.service.metadata", &m),
-                Err(e) => Ok(CallToolResult::error(format!("d365.service.metadata [{:?}]: {e}", e.code()))),
+                Err(e) => Ok(CallToolResult::error(format!(
+                    "d365.service.metadata [{:?}]: {e}",
+                    e.code()
+                ))),
             }
         }
     });
@@ -353,7 +475,11 @@ fn tool_service_metadata(ctx: &Arc<ServerContext>) -> ToolDescriptor {
 }
 
 #[derive(Deserialize)]
-struct BulkArgs { operations: Vec<String>, #[serde(default = "default_lang")] language: String }
+struct BulkArgs {
+    operations: Vec<String>,
+    #[serde(default = "default_lang")]
+    language: String,
+}
 
 fn tool_service_bulk_metadata(ctx: &Arc<ServerContext>) -> ToolDescriptor {
     let ctx = Arc::clone(ctx);
@@ -362,14 +488,26 @@ fn tool_service_bulk_metadata(ctx: &Arc<ServerContext>) -> ToolDescriptor {
         async move {
             let args: BulkArgs = match serde_json::from_value(arguments) {
                 Ok(a) => a,
-                Err(e) => return Ok(CallToolResult::error(format!("d365.service.bulk_metadata: invalid arguments: {e}"))),
+                Err(e) => {
+                    return Ok(CallToolResult::error(format!(
+                        "d365.service.bulk_metadata: invalid arguments: {e}"
+                    )))
+                }
             };
             if args.operations.is_empty() {
-                return Ok(CallToolResult::error("d365.service.bulk_metadata: operations must not be empty"));
+                return Ok(CallToolResult::error(
+                    "d365.service.bulk_metadata: operations must not be empty",
+                ));
             }
-            match ctx.d365_client.bulk_service_metadata(&args.operations, &args.language).await {
+            match ctx
+                .d365_client
+                .bulk_service_metadata(&args.operations, &args.language)
+                .await
+            {
                 Ok(m) => render_json("d365.service.bulk_metadata", &m),
-                Err(e) => Ok(CallToolResult::error(format!("d365.service.bulk_metadata: {e}"))),
+                Err(e) => Ok(CallToolResult::error(format!(
+                    "d365.service.bulk_metadata: {e}"
+                ))),
             }
         }
     });
@@ -392,46 +530,87 @@ fn tool_service_call(ctx: &Arc<ServerContext>) -> ToolDescriptor {
     let handler = ToolFn(move |arguments: serde_json::Value| {
         let ctx = Arc::clone(&ctx);
         async move {
-            let commit = arguments.get("commit").and_then(|v| v.as_bool()).unwrap_or(false);
+            let commit = arguments
+                .get("commit")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
             let audit_args = arguments.clone();
             let request: ServiceCallRequest = match serde_json::from_value(arguments) {
                 Ok(a) => a,
-                Err(e) => return Ok(CallToolResult::error(format!("d365.service.call: invalid arguments: {e}"))),
+                Err(e) => {
+                    return Ok(CallToolResult::error(format!(
+                        "d365.service.call: invalid arguments: {e}"
+                    )))
+                }
             };
             if commit {
                 // Transactional write: submit the operation inside an atomic
                 // $batch change set (gated by --enable-writes). Every attempt audited.
                 let started = Instant::now();
-                return match execute_write_operation(ctx.d365_client.as_ref(), request, ctx.read_only).await {
+                return match execute_write_operation(
+                    ctx.d365_client.as_ref(),
+                    request,
+                    ctx.read_only,
+                )
+                .await
+                {
                     Ok(outcome) => {
                         let audit_outcome = if outcome.committed {
                             AuditOutcome::ok(format!("{} committed", outcome.operation))
                         } else {
-                            AuditOutcome::failed(0, format!(
-                                "{} not committed (rolled_back={})", outcome.operation, outcome.rolled_back))
+                            AuditOutcome::failed(
+                                0,
+                                format!(
+                                    "{} not committed (rolled_back={})",
+                                    outcome.operation, outcome.rolled_back
+                                ),
+                            )
                         };
-                        record_write_audit(&ctx, "d365.service.call", &audit_args, audit_outcome, started).await;
-                        render_json("d365.service.call", &serde_json::json!({
-                            "operation": outcome.operation,
-                            "committed": outcome.committed,
-                            "rolled_back": outcome.rolled_back,
-                            "messages": outcome.messages,
-                            "result": outcome.result,
-                        }))
+                        record_write_audit(
+                            &ctx,
+                            "d365.service.call",
+                            &audit_args,
+                            audit_outcome,
+                            started,
+                        )
+                        .await;
+                        render_json(
+                            "d365.service.call",
+                            &serde_json::json!({
+                                "operation": outcome.operation,
+                                "committed": outcome.committed,
+                                "rolled_back": outcome.rolled_back,
+                                "messages": outcome.messages,
+                                "result": outcome.result,
+                            }),
+                        )
                     }
                     Err(e) => {
                         let audit_outcome = match &e {
                             D365Error::PermissionDenied(r) => AuditOutcome::denied(r.clone()),
                             other => AuditOutcome::failed(other.code().as_i32(), other.to_string()),
                         };
-                        record_write_audit(&ctx, "d365.service.call", &audit_args, audit_outcome, started).await;
-                        Ok(CallToolResult::error(format!("d365.service.call [{:?}]: {e}", e.code())))
+                        record_write_audit(
+                            &ctx,
+                            "d365.service.call",
+                            &audit_args,
+                            audit_outcome,
+                            started,
+                        )
+                        .await;
+                        Ok(CallToolResult::error(format!(
+                            "d365.service.call [{:?}]: {e}",
+                            e.code()
+                        )))
                     }
                 };
             }
             match ctx.d365_client.call_service(request, ctx.read_only).await {
                 Ok(result) => render_json("d365.service.call", &result),
-                Err(e) => Ok(CallToolResult::error(format!("d365.service.call [{:?}]: {e}", e.code()))),
+                Err(e) => Ok(CallToolResult::error(format!(
+                    "d365.service.call [{:?}]: {e}",
+                    e.code()
+                ))),
             }
         }
     });
@@ -459,11 +638,21 @@ fn tool_entity_read(ctx: &Arc<ServerContext>) -> ToolDescriptor {
         async move {
             let request: ReadEntityRequest = match serde_json::from_value(arguments) {
                 Ok(a) => a,
-                Err(e) => return Ok(CallToolResult::error(format!("d365.entity.read: invalid arguments: {e}"))),
+                Err(e) => {
+                    return Ok(CallToolResult::error(format!(
+                        "d365.entity.read: invalid arguments: {e}"
+                    )))
+                }
             };
             match ctx.d365_client.read_entity(request).await {
-                Ok(rows) => render_json("d365.entity.read", &serde_json::json!({"rows": rows, "count": rows.len()})),
-                Err(e) => Ok(CallToolResult::error(format!("d365.entity.read [{:?}]: {e}", e.code()))),
+                Ok(rows) => render_json(
+                    "d365.entity.read",
+                    &serde_json::json!({"rows": rows, "count": rows.len()}),
+                ),
+                Err(e) => Ok(CallToolResult::error(format!(
+                    "d365.entity.read [{:?}]: {e}",
+                    e.code()
+                ))),
             }
         }
     });
@@ -484,7 +673,9 @@ fn tool_entity_read(ctx: &Arc<ServerContext>) -> ToolDescriptor {
 }
 
 #[derive(Deserialize)]
-struct EntityStructArgs { entity: String }
+struct EntityStructArgs {
+    entity: String,
+}
 
 fn tool_entity_structure(ctx: &Arc<ServerContext>) -> ToolDescriptor {
     let ctx = Arc::clone(ctx);
@@ -493,11 +684,18 @@ fn tool_entity_structure(ctx: &Arc<ServerContext>) -> ToolDescriptor {
         async move {
             let args: EntityStructArgs = match serde_json::from_value(arguments) {
                 Ok(a) => a,
-                Err(e) => return Ok(CallToolResult::error(format!("d365.entity.structure: invalid arguments: {e}"))),
+                Err(e) => {
+                    return Ok(CallToolResult::error(format!(
+                        "d365.entity.structure: invalid arguments: {e}"
+                    )))
+                }
             };
             match ctx.d365_client.entity_structure(&args.entity).await {
                 Ok(s) => render_json("d365.entity.structure", &s),
-                Err(e) => Ok(CallToolResult::error(format!("d365.entity.structure [{:?}]: {e}", e.code()))),
+                Err(e) => Ok(CallToolResult::error(format!(
+                    "d365.entity.structure [{:?}]: {e}",
+                    e.code()
+                ))),
             }
         }
     });
@@ -520,19 +718,53 @@ fn tool_docs_search(ctx: &Arc<ServerContext>) -> ToolDescriptor {
         async move {
             let args: RagSearchArgs = match serde_json::from_value(arguments) {
                 Ok(a) => a,
-                Err(e) => return Ok(CallToolResult::error(format!("d365.docs.search: invalid arguments: {e}"))),
+                Err(e) => {
+                    return Ok(CallToolResult::error(format!(
+                        "d365.docs.search: invalid arguments: {e}"
+                    )))
+                }
             };
-            let q_vec = ctx.embedder.embed(std::slice::from_ref(&args.query)).await.ok().and_then(|mut v| v.pop());
-            match ctx.rag.search(Query { text: &args.query, domain: None, top_k: args.top_k, embedding: q_vec }).await {
+            let q_vec = ctx
+                .embedder
+                .embed(std::slice::from_ref(&args.query))
+                .await
+                .ok()
+                .and_then(|mut v| v.pop());
+            match ctx
+                .rag
+                .search(Query {
+                    text: &args.query,
+                    domain: None,
+                    top_k: args.top_k,
+                    embedding: q_vec,
+                })
+                .await
+            {
                 Err(e) => Ok(CallToolResult::error(format!("d365.docs.search: {e}"))),
-                Ok(hits) if hits.is_empty() => Ok(CallToolResult::text(format!("d365.docs.search: no matches for \"{}\"", args.query))),
+                Ok(hits) if hits.is_empty() => Ok(CallToolResult::text(format!(
+                    "d365.docs.search: no matches for \"{}\"",
+                    args.query
+                ))),
                 Ok(hits) => {
-                    let mut lines = vec![format!("d365.docs.search: {} hit(s) for \"{}\"", hits.len(), args.query)];
+                    let mut lines = vec![format!(
+                        "d365.docs.search: {} hit(s) for \"{}\"",
+                        hits.len(),
+                        args.query
+                    )];
                     for h in &hits {
-                        lines.push(format!("- [{:?}] {} ({:.3}) — {}\n  uri: {}",
-                            h.layer, h.hit.chunk.title, h.hit.score, truncate(&h.hit.chunk.text, 160), h.hit.chunk.uri));
+                        lines.push(format!(
+                            "- [{:?}] {} ({:.3}) — {}\n  uri: {}",
+                            h.layer,
+                            h.hit.chunk.title,
+                            h.hit.score,
+                            truncate(&h.hit.chunk.text, 160),
+                            h.hit.chunk.uri
+                        ));
                     }
-                    Ok(CallToolResult { content: vec![ToolContent::text(lines.join("\n"))], is_error: false })
+                    Ok(CallToolResult {
+                        content: vec![ToolContent::text(lines.join("\n"))],
+                        is_error: false,
+                    })
                 }
             }
         }
@@ -543,19 +775,28 @@ fn tool_docs_search(ctx: &Arc<ServerContext>) -> ToolDescriptor {
 }
 
 #[derive(Deserialize)]
-struct InfologArgs { value: serde_json::Value }
+struct InfologArgs {
+    value: serde_json::Value,
+}
 
 fn tool_infolog_parse(_ctx: &Arc<ServerContext>) -> ToolDescriptor {
     let handler = ToolFn(move |arguments: serde_json::Value| async move {
         let args: InfologArgs = match serde_json::from_value(arguments) {
             Ok(a) => a,
-            Err(e) => return Ok(CallToolResult::error(format!("d365.infolog.parse: invalid arguments: {e}"))),
+            Err(e) => {
+                return Ok(CallToolResult::error(format!(
+                    "d365.infolog.parse: invalid arguments: {e}"
+                )))
+            }
         };
         let messages = parse_infolog(&args.value);
         let failed = messages.iter().any(|m| m.is_failure());
-        render_json("d365.infolog.parse", &serde_json::json!({
-            "messages": messages, "count": messages.len(), "has_failure": failed,
-        }))
+        render_json(
+            "d365.infolog.parse",
+            &serde_json::json!({
+                "messages": messages, "count": messages.len(), "has_failure": failed,
+            }),
+        )
     });
     ToolDescriptor::new("d365.infolog.parse",
         Some("Parse an OData error payload or an Infolog message list into typed messages with severities, and report whether any message indicates failure.".into()),
@@ -577,7 +818,11 @@ fn tool_customer_search(ctx: &Arc<ServerContext>) -> ToolDescriptor {
         async move {
             let args: SearchArgs = match serde_json::from_value(arguments) {
                 Ok(a) => a,
-                Err(e) => return Ok(CallToolResult::error(format!("d365.customer.search: invalid arguments: {e}"))),
+                Err(e) => {
+                    return Ok(CallToolResult::error(format!(
+                        "d365.customer.search: invalid arguments: {e}"
+                    )))
+                }
             };
             let req = ReadEntityRequest {
                 entity: "CustomersV3".into(),
@@ -586,12 +831,19 @@ fn tool_customer_search(ctx: &Arc<ServerContext>) -> ToolDescriptor {
                 max_rows: args.limit.min(MAX_ROWS_HARD_CAP),
             };
             match ctx.d365_client.read_entity(req).await {
-                Ok(rows) => render_json("d365.customer.search", &serde_json::json!({"rows": rows, "count": rows.len()})),
-                Err(e) => Ok(CallToolResult::error(format!("d365.customer.search [{:?}]: {e}", e.code()))),
+                Ok(rows) => render_json(
+                    "d365.customer.search",
+                    &serde_json::json!({"rows": rows, "count": rows.len()}),
+                ),
+                Err(e) => Ok(CallToolResult::error(format!(
+                    "d365.customer.search [{:?}]: {e}",
+                    e.code()
+                ))),
             }
         }
     });
-    ToolDescriptor::new("d365.customer.search",
+    ToolDescriptor::new(
+        "d365.customer.search",
         Some("Search customers (CustomersV3) by organization name. Read-only.".into()),
         ToolInputSchema::from_value(serde_json::json!({
             "type": "object",
@@ -599,11 +851,14 @@ fn tool_customer_search(ctx: &Arc<ServerContext>) -> ToolDescriptor {
             "required": ["query"],
             "additionalProperties": false
         })),
-        Arc::new(handler))
+        Arc::new(handler),
+    )
 }
 
 #[derive(Deserialize)]
-struct CustomerGetArgs { customer_account: String }
+struct CustomerGetArgs {
+    customer_account: String,
+}
 
 fn tool_customer_get(ctx: &Arc<ServerContext>) -> ToolDescriptor {
     let ctx = Arc::clone(ctx);
@@ -612,7 +867,11 @@ fn tool_customer_get(ctx: &Arc<ServerContext>) -> ToolDescriptor {
         async move {
             let args: CustomerGetArgs = match serde_json::from_value(arguments) {
                 Ok(a) => a,
-                Err(e) => return Ok(CallToolResult::error(format!("d365.customer.get: invalid arguments: {e}"))),
+                Err(e) => {
+                    return Ok(CallToolResult::error(format!(
+                        "d365.customer.get: invalid arguments: {e}"
+                    )))
+                }
             };
             let req = ReadEntityRequest {
                 entity: "CustomersV3".into(),
@@ -621,13 +880,20 @@ fn tool_customer_get(ctx: &Arc<ServerContext>) -> ToolDescriptor {
                 max_rows: 1,
             };
             match ctx.d365_client.read_entity(req).await {
-                Ok(rows) if rows.is_empty() => Ok(CallToolResult::error(format!("d365.customer.get: customer '{}' not found", args.customer_account))),
+                Ok(rows) if rows.is_empty() => Ok(CallToolResult::error(format!(
+                    "d365.customer.get: customer '{}' not found",
+                    args.customer_account
+                ))),
                 Ok(rows) => render_json("d365.customer.get", &rows[0]),
-                Err(e) => Ok(CallToolResult::error(format!("d365.customer.get [{:?}]: {e}", e.code()))),
+                Err(e) => Ok(CallToolResult::error(format!(
+                    "d365.customer.get [{:?}]: {e}",
+                    e.code()
+                ))),
             }
         }
     });
-    ToolDescriptor::new("d365.customer.get",
+    ToolDescriptor::new(
+        "d365.customer.get",
         Some("Fetch a single customer (CustomersV3) by account number. Read-only.".into()),
         ToolInputSchema::from_value(serde_json::json!({
             "type": "object",
@@ -635,7 +901,8 @@ fn tool_customer_get(ctx: &Arc<ServerContext>) -> ToolDescriptor {
             "required": ["customer_account"],
             "additionalProperties": false
         })),
-        Arc::new(handler))
+        Arc::new(handler),
+    )
 }
 
 // ===========================================================================
@@ -644,10 +911,30 @@ fn tool_customer_get(ctx: &Arc<ServerContext>) -> ToolDescriptor {
 
 pub fn meta_tools(ctx: &Arc<ServerContext>) -> Vec<ToolDescriptor> {
     vec![
-        meta_get(ctx, "xpp.meta.get_class", "Retrieve X++ class source.", MetaKind::Class),
-        meta_get(ctx, "xpp.meta.get_interface", "Retrieve X++ interface source.", MetaKind::Interface),
-        meta_get(ctx, "xpp.meta.get_table", "Retrieve X++ table definition.", MetaKind::Table),
-        meta_get(ctx, "xpp.meta.get_job", "Retrieve X++ job source.", MetaKind::Job),
+        meta_get(
+            ctx,
+            "xpp.meta.get_class",
+            "Retrieve X++ class source.",
+            MetaKind::Class,
+        ),
+        meta_get(
+            ctx,
+            "xpp.meta.get_interface",
+            "Retrieve X++ interface source.",
+            MetaKind::Interface,
+        ),
+        meta_get(
+            ctx,
+            "xpp.meta.get_table",
+            "Retrieve X++ table definition.",
+            MetaKind::Table,
+        ),
+        meta_get(
+            ctx,
+            "xpp.meta.get_job",
+            "Retrieve X++ job source.",
+            MetaKind::Job,
+        ),
         meta_get_data_entity(ctx),
         meta_get_model_contents(ctx),
         meta_search(ctx),
@@ -658,10 +945,17 @@ pub fn meta_tools(ctx: &Arc<ServerContext>) -> Vec<ToolDescriptor> {
 }
 
 #[derive(Clone, Copy)]
-enum MetaKind { Class, Interface, Table, Job }
+enum MetaKind {
+    Class,
+    Interface,
+    Table,
+    Job,
+}
 
 #[derive(Deserialize)]
-struct NameArgs { name: String }
+struct NameArgs {
+    name: String,
+}
 
 fn name_schema() -> ToolInputSchema {
     ToolInputSchema::from_value(serde_json::json!({
@@ -691,7 +985,10 @@ fn meta_get(ctx: &Arc<ServerContext>, name: &str, desc: &str, kind: MetaKind) ->
             };
             match result {
                 Ok(p) => render_json(&tool_name, &p),
-                Err(e) => Ok(CallToolResult::error(format!("{tool_name} [{:?}]: {e}", e.code()))),
+                Err(e) => Ok(CallToolResult::error(format!(
+                    "{tool_name} [{:?}]: {e}",
+                    e.code()
+                ))),
             }
         }
     });
@@ -705,11 +1002,18 @@ fn meta_get_data_entity(ctx: &Arc<ServerContext>) -> ToolDescriptor {
         async move {
             let args: NameArgs = match serde_json::from_value(arguments) {
                 Ok(a) => a,
-                Err(e) => return Ok(CallToolResult::error(format!("xpp.meta.get_data_entity: {e}"))),
+                Err(e) => {
+                    return Ok(CallToolResult::error(format!(
+                        "xpp.meta.get_data_entity: {e}"
+                    )))
+                }
             };
             match ctx.meta_client.get_data_entity(&args.name).await {
                 Ok(v) => render_json("xpp.meta.get_data_entity", &v),
-                Err(e) => Ok(CallToolResult::error(format!("xpp.meta.get_data_entity [{:?}]: {e}", e.code()))),
+                Err(e) => Ok(CallToolResult::error(format!(
+                    "xpp.meta.get_data_entity [{:?}]: {e}",
+                    e.code()
+                ))),
             }
         }
     });
@@ -719,7 +1023,9 @@ fn meta_get_data_entity(ctx: &Arc<ServerContext>) -> ToolDescriptor {
 }
 
 #[derive(Deserialize)]
-struct ModelArgs { model: String }
+struct ModelArgs {
+    model: String,
+}
 
 fn meta_get_model_contents(ctx: &Arc<ServerContext>) -> ToolDescriptor {
     let ctx = Arc::clone(ctx);
@@ -728,15 +1034,23 @@ fn meta_get_model_contents(ctx: &Arc<ServerContext>) -> ToolDescriptor {
         async move {
             let args: ModelArgs = match serde_json::from_value(arguments) {
                 Ok(a) => a,
-                Err(e) => return Ok(CallToolResult::error(format!("xpp.meta.get_model_contents: {e}"))),
+                Err(e) => {
+                    return Ok(CallToolResult::error(format!(
+                        "xpp.meta.get_model_contents: {e}"
+                    )))
+                }
             };
             match ctx.meta_client.get_model_contents(&args.model).await {
                 Ok(c) => render_json("xpp.meta.get_model_contents", &c),
-                Err(e) => Ok(CallToolResult::error(format!("xpp.meta.get_model_contents [{:?}]: {e}", e.code()))),
+                Err(e) => Ok(CallToolResult::error(format!(
+                    "xpp.meta.get_model_contents [{:?}]: {e}",
+                    e.code()
+                ))),
             }
         }
     });
-    ToolDescriptor::new("xpp.meta.get_model_contents",
+    ToolDescriptor::new(
+        "xpp.meta.get_model_contents",
         Some("List the objects in a model (classes, jobs, interfaces, tables, ...).".into()),
         ToolInputSchema::from_value(serde_json::json!({
             "type": "object",
@@ -744,12 +1058,25 @@ fn meta_get_model_contents(ctx: &Arc<ServerContext>) -> ToolDescriptor {
             "required": ["model"],
             "additionalProperties": false,
         })),
-        Arc::new(handler))
+        Arc::new(handler),
+    )
 }
 
 const XPP_KIND_ENUM: &[&str] = &[
-    "class","interface","table","data_entity","view","form","job","query",
-    "enum_type","extended_data_type","macro","model","custom_service","menu_item",
+    "class",
+    "interface",
+    "table",
+    "data_entity",
+    "view",
+    "form",
+    "job",
+    "query",
+    "enum_type",
+    "extended_data_type",
+    "macro",
+    "model",
+    "custom_service",
+    "menu_item",
 ];
 
 #[derive(Deserialize)]
@@ -760,7 +1087,9 @@ struct MetaSearchArgs {
     #[serde(default = "default_max_results")]
     max_results: usize,
 }
-fn default_max_results() -> usize { 25 }
+fn default_max_results() -> usize {
+    25
+}
 
 fn meta_search(ctx: &Arc<ServerContext>) -> ToolDescriptor {
     let ctx = Arc::clone(ctx);
@@ -771,10 +1100,17 @@ fn meta_search(ctx: &Arc<ServerContext>) -> ToolDescriptor {
                 Ok(a) => a,
                 Err(e) => return Ok(CallToolResult::error(format!("xpp.meta.search: {e}"))),
             };
-            let req = MetaSearchRequest { query: args.query, kind: args.kind, max_results: args.max_results };
+            let req = MetaSearchRequest {
+                query: args.query,
+                kind: args.kind,
+                max_results: args.max_results,
+            };
             match ctx.meta_client.search(req).await {
                 Ok(hits) => render_json("xpp.meta.search", &serde_json::json!({"hits": hits})),
-                Err(e) => Ok(CallToolResult::error(format!("xpp.meta.search [{:?}]: {e}", e.code()))),
+                Err(e) => Ok(CallToolResult::error(format!(
+                    "xpp.meta.search [{:?}]: {e}",
+                    e.code()
+                ))),
             }
         }
     });
@@ -794,7 +1130,10 @@ fn meta_search(ctx: &Arc<ServerContext>) -> ToolDescriptor {
 }
 
 #[derive(Deserialize)]
-struct CrossRefArgs { name: String, kind: XppObjectKind }
+struct CrossRefArgs {
+    name: String,
+    kind: XppObjectKind,
+}
 
 fn meta_cross_reference(ctx: &Arc<ServerContext>) -> ToolDescriptor {
     let ctx = Arc::clone(ctx);
@@ -803,12 +1142,25 @@ fn meta_cross_reference(ctx: &Arc<ServerContext>) -> ToolDescriptor {
         async move {
             let args: CrossRefArgs = match serde_json::from_value(arguments) {
                 Ok(a) => a,
-                Err(e) => return Ok(CallToolResult::error(format!("xpp.meta.cross_reference: {e}"))),
+                Err(e) => {
+                    return Ok(CallToolResult::error(format!(
+                        "xpp.meta.cross_reference: {e}"
+                    )))
+                }
             };
-            let req = CrossReferenceRequest { name: args.name, kind: args.kind };
+            let req = CrossReferenceRequest {
+                name: args.name,
+                kind: args.kind,
+            };
             match ctx.meta_client.cross_reference(req).await {
-                Ok(hits) => render_json("xpp.meta.cross_reference", &serde_json::json!({"hits": hits})),
-                Err(e) => Ok(CallToolResult::error(format!("xpp.meta.cross_reference [{:?}]: {e}", e.code()))),
+                Ok(hits) => render_json(
+                    "xpp.meta.cross_reference",
+                    &serde_json::json!({"hits": hits}),
+                ),
+                Err(e) => Ok(CallToolResult::error(format!(
+                    "xpp.meta.cross_reference [{:?}]: {e}",
+                    e.code()
+                ))),
             }
         }
     });
@@ -827,8 +1179,14 @@ fn meta_cross_reference(ctx: &Arc<ServerContext>) -> ToolDescriptor {
 }
 
 #[derive(Deserialize)]
-struct EntityContentsArgs { entity: String, #[serde(default = "default_max_rows_100")] max_rows: usize }
-fn default_max_rows_100() -> usize { 100 }
+struct EntityContentsArgs {
+    entity: String,
+    #[serde(default = "default_max_rows_100")]
+    max_rows: usize,
+}
+fn default_max_rows_100() -> usize {
+    100
+}
 
 fn meta_get_entity_contents(ctx: &Arc<ServerContext>) -> ToolDescriptor {
     let ctx = Arc::clone(ctx);
@@ -837,11 +1195,25 @@ fn meta_get_entity_contents(ctx: &Arc<ServerContext>) -> ToolDescriptor {
         async move {
             let args: EntityContentsArgs = match serde_json::from_value(arguments) {
                 Ok(a) => a,
-                Err(e) => return Ok(CallToolResult::error(format!("xpp.meta.get_entity_contents: {e}"))),
+                Err(e) => {
+                    return Ok(CallToolResult::error(format!(
+                        "xpp.meta.get_entity_contents: {e}"
+                    )))
+                }
             };
-            match ctx.meta_client.get_entity_contents(&args.entity, args.max_rows).await {
-                Ok(rows) => render_json("xpp.meta.get_entity_contents", &serde_json::json!({"rows": rows, "count": rows.len()})),
-                Err(e) => Ok(CallToolResult::error(format!("xpp.meta.get_entity_contents [{:?}]: {e}", e.code()))),
+            match ctx
+                .meta_client
+                .get_entity_contents(&args.entity, args.max_rows)
+                .await
+            {
+                Ok(rows) => render_json(
+                    "xpp.meta.get_entity_contents",
+                    &serde_json::json!({"rows": rows, "count": rows.len()}),
+                ),
+                Err(e) => Ok(CallToolResult::error(format!(
+                    "xpp.meta.get_entity_contents [{:?}]: {e}",
+                    e.code()
+                ))),
             }
         }
     });
@@ -860,7 +1232,10 @@ fn meta_get_entity_contents(ctx: &Arc<ServerContext>) -> ToolDescriptor {
 }
 
 #[derive(Deserialize)]
-struct DeployArgs { name: String, kind: XppObjectKind }
+struct DeployArgs {
+    name: String,
+    kind: XppObjectKind,
+}
 
 fn meta_deploy(ctx: &Arc<ServerContext>) -> ToolDescriptor {
     let ctx = Arc::clone(ctx);
@@ -871,11 +1246,19 @@ fn meta_deploy(ctx: &Arc<ServerContext>) -> ToolDescriptor {
                 Ok(a) => a,
                 Err(e) => return Ok(CallToolResult::error(format!("xpp.meta.deploy: {e}"))),
             };
-            let req = DeployRequest { name: args.name, kind: args.kind };
-            let call_ctx = MetaCallContext { read_only: ctx.read_only };
+            let req = DeployRequest {
+                name: args.name,
+                kind: args.kind,
+            };
+            let call_ctx = MetaCallContext {
+                read_only: ctx.read_only,
+            };
             match ctx.meta_client.deploy(req, call_ctx).await {
                 Ok(outcome) => render_json("xpp.meta.deploy", &outcome),
-                Err(e) => Ok(CallToolResult::error(format!("xpp.meta.deploy [{:?}]: {e}", e.code()))),
+                Err(e) => Ok(CallToolResult::error(format!(
+                    "xpp.meta.deploy [{:?}]: {e}",
+                    e.code()
+                ))),
             }
         }
     });
@@ -899,19 +1282,33 @@ fn meta_deploy(ctx: &Arc<ServerContext>) -> ToolDescriptor {
 // ===========================================================================
 
 pub fn graph_tools(ctx: &Arc<ServerContext>) -> Vec<ToolDescriptor> {
-    vec![kb_multi_hop(ctx), kb_global_query(ctx), kb_summarise(ctx), kb_graph_neighborhood(ctx)]
+    vec![
+        kb_multi_hop(ctx),
+        kb_global_query(ctx),
+        kb_summarise(ctx),
+        kb_graph_neighborhood(ctx),
+    ]
 }
 
 #[derive(Deserialize)]
 struct MultiHopArgs {
     query: String,
-    #[serde(default = "default_max_hops")] max_hops: u32,
-    #[serde(default = "default_top_k_graph")] top_k: usize,
-    #[serde(default = "default_max_seeds")] max_seeds: usize,
+    #[serde(default = "default_max_hops")]
+    max_hops: u32,
+    #[serde(default = "default_top_k_graph")]
+    top_k: usize,
+    #[serde(default = "default_max_seeds")]
+    max_seeds: usize,
 }
-fn default_max_hops() -> u32 { 4 }
-fn default_top_k_graph() -> usize { 8 }
-fn default_max_seeds() -> usize { 3 }
+fn default_max_hops() -> u32 {
+    4
+}
+fn default_top_k_graph() -> usize {
+    8
+}
+fn default_max_seeds() -> usize {
+    3
+}
 
 fn kb_multi_hop(ctx: &Arc<ServerContext>) -> ToolDescriptor {
     let ctx = Arc::clone(ctx);
@@ -920,9 +1317,15 @@ fn kb_multi_hop(ctx: &Arc<ServerContext>) -> ToolDescriptor {
         async move {
             let args: MultiHopArgs = match serde_json::from_value(arguments) {
                 Ok(a) => a,
-                Err(e) => return Ok(CallToolResult::error(format!("kb.multi_hop: invalid arguments: {e}"))),
+                Err(e) => {
+                    return Ok(CallToolResult::error(format!(
+                        "kb.multi_hop: invalid arguments: {e}"
+                    )))
+                }
             };
-            let response = ctx.graph.multi_hop(&args.query, args.max_hops, args.top_k, args.max_seeds);
+            let response =
+                ctx.graph
+                    .multi_hop(&args.query, args.max_hops, args.top_k, args.max_seeds);
             render_json("kb.multi_hop", &response)
         }
     });
@@ -943,8 +1346,14 @@ fn kb_multi_hop(ctx: &Arc<ServerContext>) -> ToolDescriptor {
 }
 
 #[derive(Deserialize)]
-struct GlobalQueryArgs { query: String, #[serde(default = "default_top_k_3")] top_k: usize }
-fn default_top_k_3() -> usize { 3 }
+struct GlobalQueryArgs {
+    query: String,
+    #[serde(default = "default_top_k_3")]
+    top_k: usize,
+}
+fn default_top_k_3() -> usize {
+    3
+}
 
 fn kb_global_query(ctx: &Arc<ServerContext>) -> ToolDescriptor {
     let ctx = Arc::clone(ctx);
@@ -953,7 +1362,11 @@ fn kb_global_query(ctx: &Arc<ServerContext>) -> ToolDescriptor {
         async move {
             let args: GlobalQueryArgs = match serde_json::from_value(arguments) {
                 Ok(a) => a,
-                Err(e) => return Ok(CallToolResult::error(format!("kb.global_query: invalid arguments: {e}"))),
+                Err(e) => {
+                    return Ok(CallToolResult::error(format!(
+                        "kb.global_query: invalid arguments: {e}"
+                    )))
+                }
             };
             let response = ctx.graph.community_query(&args.query, args.top_k);
             render_json("kb.global_query", &response)
@@ -971,9 +1384,18 @@ fn kb_global_query(ctx: &Arc<ServerContext>) -> ToolDescriptor {
 }
 
 #[derive(Deserialize)]
-struct SummariseArgs { #[serde(default = "default_level_2")] level: u32, #[serde(default = "default_top_k_10")] top_k: usize }
-fn default_level_2() -> u32 { 2 }
-fn default_top_k_10() -> usize { 10 }
+struct SummariseArgs {
+    #[serde(default = "default_level_2")]
+    level: u32,
+    #[serde(default = "default_top_k_10")]
+    top_k: usize,
+}
+fn default_level_2() -> u32 {
+    2
+}
+fn default_top_k_10() -> usize {
+    10
+}
 
 fn kb_summarise(ctx: &Arc<ServerContext>) -> ToolDescriptor {
     let ctx = Arc::clone(ctx);
@@ -982,7 +1404,11 @@ fn kb_summarise(ctx: &Arc<ServerContext>) -> ToolDescriptor {
         async move {
             let args: SummariseArgs = match serde_json::from_value(arguments) {
                 Ok(a) => a,
-                Err(e) => return Ok(CallToolResult::error(format!("kb.summarise: invalid arguments: {e}"))),
+                Err(e) => {
+                    return Ok(CallToolResult::error(format!(
+                        "kb.summarise: invalid arguments: {e}"
+                    )))
+                }
             };
             let response = ctx.graph.raptor_summary(args.level, args.top_k);
             render_json("kb.summarise", &response)
@@ -1001,8 +1427,10 @@ fn kb_summarise(ctx: &Arc<ServerContext>) -> ToolDescriptor {
 #[derive(Deserialize)]
 struct NeighborhoodArgs {
     seeds: Vec<String>,
-    #[serde(default = "default_max_hops")] max_hops: u32,
-    #[serde(default = "default_top_k_graph")] top_k: usize,
+    #[serde(default = "default_max_hops")]
+    max_hops: u32,
+    #[serde(default = "default_top_k_graph")]
+    top_k: usize,
 }
 
 fn kb_graph_neighborhood(ctx: &Arc<ServerContext>) -> ToolDescriptor {
@@ -1012,12 +1440,20 @@ fn kb_graph_neighborhood(ctx: &Arc<ServerContext>) -> ToolDescriptor {
         async move {
             let args: NeighborhoodArgs = match serde_json::from_value(arguments) {
                 Ok(a) => a,
-                Err(e) => return Ok(CallToolResult::error(format!("kb.graph_neighborhood: invalid arguments: {e}"))),
+                Err(e) => {
+                    return Ok(CallToolResult::error(format!(
+                        "kb.graph_neighborhood: invalid arguments: {e}"
+                    )))
+                }
             };
             if args.seeds.is_empty() {
-                return Ok(CallToolResult::error("kb.graph_neighborhood: seeds must not be empty"));
+                return Ok(CallToolResult::error(
+                    "kb.graph_neighborhood: seeds must not be empty",
+                ));
             }
-            let response = ctx.graph.neighborhood(&args.seeds, args.max_hops, args.top_k);
+            let response = ctx
+                .graph
+                .neighborhood(&args.seeds, args.max_hops, args.top_k);
             render_json("kb.graph_neighborhood", &response)
         }
     });
@@ -1057,13 +1493,20 @@ fn workflow_create_purchase_order(ctx: &Arc<ServerContext>) -> ToolDescriptor {
             let audit_args = arguments.clone();
             #[derive(Deserialize)]
             struct PoArgs {
-                #[serde(default)] vendor: Option<String>,
-                #[serde(default)] item: Option<String>,
-                #[serde(default)] quantity: Option<f64>,
+                #[serde(default)]
+                vendor: Option<String>,
+                #[serde(default)]
+                item: Option<String>,
+                #[serde(default)]
+                quantity: Option<f64>,
             }
             let args: PoArgs = match serde_json::from_value(arguments) {
                 Ok(a) => a,
-                Err(e) => return Ok(CallToolResult::error(format!("d365.workflow.create_purchase_order: {e}"))),
+                Err(e) => {
+                    return Ok(CallToolResult::error(format!(
+                        "d365.workflow.create_purchase_order: {e}"
+                    )))
+                }
             };
             let schema = mcp_server::object_schema(
                 serde_json::json!({
@@ -1085,18 +1528,41 @@ fn workflow_create_purchase_order(ctx: &Arc<ServerContext>) -> ToolDescriptor {
             match elicit.action {
                 ElicitationAction::Accept => {
                     let content = elicit.content.unwrap_or_else(|| serde_json::json!({}));
-                    record_write_audit(&ctx, "d365.workflow.create_purchase_order", &audit_args, AuditOutcome::ok("purchase order confirmed (mock)"), started).await;
+                    record_write_audit(
+                        &ctx,
+                        "d365.workflow.create_purchase_order",
+                        &audit_args,
+                        AuditOutcome::ok("purchase order confirmed (mock)"),
+                        started,
+                    )
+                    .await;
                     Ok(CallToolResult::text(format!(
                         "Purchase order confirmed (mock; no real $batch submitted):\n\n{}\n\nNext step (when --enable-writes): d365.service.call PurchaseOrderCreate with commit=true.",
                         serde_json::to_string_pretty(&content).unwrap_or_default(),
                     )))
                 }
                 ElicitationAction::Decline => {
-                    record_write_audit(&ctx, "d365.workflow.create_purchase_order", &audit_args, AuditOutcome::declined("user declined elicitation"), started).await;
-                    Ok(CallToolResult::text("Purchase order cancelled by user (declined elicitation)."))
+                    record_write_audit(
+                        &ctx,
+                        "d365.workflow.create_purchase_order",
+                        &audit_args,
+                        AuditOutcome::declined("user declined elicitation"),
+                        started,
+                    )
+                    .await;
+                    Ok(CallToolResult::text(
+                        "Purchase order cancelled by user (declined elicitation).",
+                    ))
                 }
                 ElicitationAction::Cancel => {
-                    record_write_audit(&ctx, "d365.workflow.create_purchase_order", &audit_args, AuditOutcome::denied("user aborted or elicitation unavailable"), started).await;
+                    record_write_audit(
+                        &ctx,
+                        "d365.workflow.create_purchase_order",
+                        &audit_args,
+                        AuditOutcome::denied("user aborted or elicitation unavailable"),
+                        started,
+                    )
+                    .await;
                     Ok(CallToolResult::error("Purchase order cancelled (user aborted or elicitation unavailable). No action taken."))
                 }
             }
@@ -1124,10 +1590,17 @@ fn workflow_maintain_customer(ctx: &Arc<ServerContext>) -> ToolDescriptor {
             let started = Instant::now();
             let audit_args = arguments.clone();
             #[derive(Deserialize)]
-            struct CmArgs { #[serde(default)] customer: Option<String> }
+            struct CmArgs {
+                #[serde(default)]
+                customer: Option<String>,
+            }
             let args: CmArgs = match serde_json::from_value(arguments) {
                 Ok(a) => a,
-                Err(e) => return Ok(CallToolResult::error(format!("d365.workflow.maintain_customer: {e}"))),
+                Err(e) => {
+                    return Ok(CallToolResult::error(format!(
+                        "d365.workflow.maintain_customer: {e}"
+                    )))
+                }
             };
             let pick_schema = mcp_server::object_schema(
                 serde_json::json!({
@@ -1137,16 +1610,37 @@ fn workflow_maintain_customer(ctx: &Arc<ServerContext>) -> ToolDescriptor {
                 }).as_object().unwrap().clone(),
                 vec!["scope".into(), "legal_entity".into()],
             );
-            let pick = mcp_server::elicit("Select customer and which data view to maintain.", pick_schema).await;
+            let pick = mcp_server::elicit(
+                "Select customer and which data view to maintain.",
+                pick_schema,
+            )
+            .await;
 
             use mcp_core::ElicitationAction;
             if pick.action != ElicitationAction::Accept {
-                record_write_audit(&ctx, "d365.workflow.maintain_customer", &audit_args, AuditOutcome::declined("cancelled at scope selection"), started).await;
-                return Ok(CallToolResult::error("Customer maintenance cancelled at scope selection."));
+                record_write_audit(
+                    &ctx,
+                    "d365.workflow.maintain_customer",
+                    &audit_args,
+                    AuditOutcome::declined("cancelled at scope selection"),
+                    started,
+                )
+                .await;
+                return Ok(CallToolResult::error(
+                    "Customer maintenance cancelled at scope selection.",
+                ));
             }
             let picked = pick.content.unwrap_or(serde_json::Value::Null);
-            let customer = picked.get("customer").and_then(|v| v.as_str()).unwrap_or("").to_string();
-            let scope = picked.get("scope").and_then(|v| v.as_str()).unwrap_or("general").to_string();
+            let customer = picked
+                .get("customer")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let scope = picked
+                .get("scope")
+                .and_then(|v| v.as_str())
+                .unwrap_or("general")
+                .to_string();
 
             let fields_schema = match scope.as_str() {
                 "general" => serde_json::json!({
@@ -1166,7 +1660,8 @@ fn workflow_maintain_customer(ctx: &Arc<ServerContext>) -> ToolDescriptor {
                 }),
                 _ => serde_json::json!({}),
             };
-            let confirm_schema = mcp_server::object_schema(fields_schema.as_object().unwrap().clone(), Vec::new());
+            let confirm_schema =
+                mcp_server::object_schema(fields_schema.as_object().unwrap().clone(), Vec::new());
             let confirm = mcp_server::elicit(
                 &format!("Enter new values for customer {customer} ({scope} view). Leave fields blank to keep current values."),
                 confirm_schema,
@@ -1175,18 +1670,41 @@ fn workflow_maintain_customer(ctx: &Arc<ServerContext>) -> ToolDescriptor {
             match confirm.action {
                 ElicitationAction::Accept => {
                     let changes = confirm.content.unwrap_or(serde_json::json!({}));
-                    record_write_audit(&ctx, "d365.workflow.maintain_customer", &audit_args, AuditOutcome::ok(format!("customer {customer} change confirmed (mock)")), started).await;
+                    record_write_audit(
+                        &ctx,
+                        "d365.workflow.maintain_customer",
+                        &audit_args,
+                        AuditOutcome::ok(format!("customer {customer} change confirmed (mock)")),
+                        started,
+                    )
+                    .await;
                     Ok(CallToolResult::text(format!(
                         "Customer change confirmed (mock):\n  customer: {customer}\n  scope:    {scope}\n  changes:\n{}\n\nNext step (when --enable-writes): d365.service.call CustomerMaintain with commit=true.",
                         serde_json::to_string_pretty(&changes).unwrap_or_default(),
                     )))
                 }
                 ElicitationAction::Decline => {
-                    record_write_audit(&ctx, "d365.workflow.maintain_customer", &audit_args, AuditOutcome::declined("user declined field entry"), started).await;
-                    Ok(CallToolResult::text("Customer change declined; no action taken."))
+                    record_write_audit(
+                        &ctx,
+                        "d365.workflow.maintain_customer",
+                        &audit_args,
+                        AuditOutcome::declined("user declined field entry"),
+                        started,
+                    )
+                    .await;
+                    Ok(CallToolResult::text(
+                        "Customer change declined; no action taken.",
+                    ))
                 }
                 ElicitationAction::Cancel => {
-                    record_write_audit(&ctx, "d365.workflow.maintain_customer", &audit_args, AuditOutcome::denied("cancelled"), started).await;
+                    record_write_audit(
+                        &ctx,
+                        "d365.workflow.maintain_customer",
+                        &audit_args,
+                        AuditOutcome::denied("cancelled"),
+                        started,
+                    )
+                    .await;
                     Ok(CallToolResult::error("Customer maintenance cancelled."))
                 }
             }
@@ -1210,10 +1728,16 @@ fn workflow_deploy_package(ctx: &Arc<ServerContext>) -> ToolDescriptor {
             let started = Instant::now();
             let audit_args = arguments.clone();
             #[derive(Deserialize)]
-            struct PkgArgs { package: Option<String> }
+            struct PkgArgs {
+                package: Option<String>,
+            }
             let args: PkgArgs = match serde_json::from_value(arguments) {
                 Ok(a) => a,
-                Err(e) => return Ok(CallToolResult::error(format!("d365.workflow.deploy_package: {e}"))),
+                Err(e) => {
+                    return Ok(CallToolResult::error(format!(
+                        "d365.workflow.deploy_package: {e}"
+                    )))
+                }
             };
             let initial = args.package.unwrap_or_default();
             let schema = mcp_server::object_schema(
@@ -1235,15 +1759,37 @@ fn workflow_deploy_package(ctx: &Arc<ServerContext>) -> ToolDescriptor {
             match elicit.action {
                 ElicitationAction::Accept => {
                     let v = elicit.content.unwrap_or(serde_json::Value::Null);
-                    let pkg    = v.get("package").and_then(|x| x.as_str()).unwrap_or("");
-                    let phrase = v.get("confirmation_phrase").and_then(|x| x.as_str()).unwrap_or("");
-                    let target = v.get("target_environment").and_then(|x| x.as_str()).unwrap_or("UAT");
+                    let pkg = v.get("package").and_then(|x| x.as_str()).unwrap_or("");
+                    let phrase = v
+                        .get("confirmation_phrase")
+                        .and_then(|x| x.as_str())
+                        .unwrap_or("");
+                    let target = v
+                        .get("target_environment")
+                        .and_then(|x| x.as_str())
+                        .unwrap_or("UAT");
                     if pkg != phrase {
-                        record_write_audit(&ctx, "d365.workflow.deploy_package", &audit_args, AuditOutcome::denied("confirmation phrase mismatch"), started).await;
+                        record_write_audit(
+                            &ctx,
+                            "d365.workflow.deploy_package",
+                            &audit_args,
+                            AuditOutcome::denied("confirmation phrase mismatch"),
+                            started,
+                        )
+                        .await;
                         return Ok(CallToolResult::error(format!(
                             "Confirmation phrase '{phrase}' does not match package '{pkg}'. Deployment aborted.")));
                     }
-                    record_write_audit(&ctx, "d365.workflow.deploy_package", &audit_args, AuditOutcome::ok(format!("package {pkg} deploy confirmed → {target} (mock)")), started).await;
+                    record_write_audit(
+                        &ctx,
+                        "d365.workflow.deploy_package",
+                        &audit_args,
+                        AuditOutcome::ok(format!(
+                            "package {pkg} deploy confirmed → {target} (mock)"
+                        )),
+                        started,
+                    )
+                    .await;
                     Ok(CallToolResult::text(format!(
                         "Deployment plan confirmed (mock):\n  package:               {pkg}\n  target_environment:    {target}\n  run_db_sync:           {}\n  skip_solution_checker: {}\n\nNext step (when --enable-writes): apply the deployable package via LCS.",
                         v.get("run_db_sync").and_then(|x| x.as_bool()).unwrap_or(true),
@@ -1251,11 +1797,27 @@ fn workflow_deploy_package(ctx: &Arc<ServerContext>) -> ToolDescriptor {
                     )))
                 }
                 ElicitationAction::Decline => {
-                    record_write_audit(&ctx, "d365.workflow.deploy_package", &audit_args, AuditOutcome::declined("user declined deployment"), started).await;
-                    Ok(CallToolResult::text("Package deployment declined; no action taken."))
+                    record_write_audit(
+                        &ctx,
+                        "d365.workflow.deploy_package",
+                        &audit_args,
+                        AuditOutcome::declined("user declined deployment"),
+                        started,
+                    )
+                    .await;
+                    Ok(CallToolResult::text(
+                        "Package deployment declined; no action taken.",
+                    ))
                 }
                 ElicitationAction::Cancel => {
-                    record_write_audit(&ctx, "d365.workflow.deploy_package", &audit_args, AuditOutcome::denied("elicitation unavailable"), started).await;
+                    record_write_audit(
+                        &ctx,
+                        "d365.workflow.deploy_package",
+                        &audit_args,
+                        AuditOutcome::denied("elicitation unavailable"),
+                        started,
+                    )
+                    .await;
                     Ok(CallToolResult::error("Package deployment cancelled (client lacks elicitation capability — refusing to proceed without confirmation)."))
                 }
             }
@@ -1282,30 +1844,36 @@ async fn record_write_audit(
     outcome: AuditOutcome,
     started: Instant,
 ) {
-    ctx.audit.record(AuditEntry {
-        event_id: AuditLog::new_event_id(),
-        at_ms: AuditLog::now_ms(),
-        session_id: None,
-        tenant: None,
-        actor: None,
-        tool: tool.to_string(),
-        environment: ctx.environment.clone(),
-        arguments_redacted: arguments.clone(),
-        outcome,
-        duration_ms: started.elapsed().as_millis() as u64,
-    }).await;
+    ctx.audit
+        .record(AuditEntry {
+            event_id: AuditLog::new_event_id(),
+            at_ms: AuditLog::now_ms(),
+            session_id: None,
+            tenant: None,
+            actor: None,
+            tool: tool.to_string(),
+            environment: ctx.environment.clone(),
+            arguments_redacted: arguments.clone(),
+            outcome,
+            duration_ms: started.elapsed().as_millis() as u64,
+        })
+        .await;
 }
 
 fn render_json<T: serde::Serialize>(tool: &str, value: &T) -> mcp_core::Result<CallToolResult> {
     match serde_json::to_string_pretty(value) {
-        Ok(s) => Ok(CallToolResult { content: vec![ToolContent::text(s)], is_error: false }),
+        Ok(s) => Ok(CallToolResult {
+            content: vec![ToolContent::text(s)],
+            is_error: false,
+        }),
         Err(e) => Ok(CallToolResult::error(format!("{tool}: serialise: {e}"))),
     }
 }
 
 fn truncate(s: &str, n: usize) -> String {
-    if s.chars().count() <= n { s.to_string() }
-    else {
+    if s.chars().count() <= n {
+        s.to_string()
+    } else {
         let mut out: String = s.chars().take(n).collect();
         out.push('…');
         out

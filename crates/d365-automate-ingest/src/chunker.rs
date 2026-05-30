@@ -44,7 +44,16 @@ pub fn chunk_document(doc: &Document, cfg: &ChunkerConfig) -> Vec<Chunk> {
     } else {
         String::new()
     };
-    let prefix = format!("{}{}{}\n", breadcrumb, doc.title, if context.is_empty() { "".to_string() } else { format!("\n{context}") });
+    let prefix = format!(
+        "{}{}{}\n",
+        breadcrumb,
+        doc.title,
+        if context.is_empty() {
+            "".to_string()
+        } else {
+            format!("\n{context}")
+        }
+    );
 
     let body = doc.body.trim();
     if body.is_empty() {
@@ -95,16 +104,24 @@ fn split_text(body: &str, target: usize, overlap: usize) -> Vec<String> {
             }
         }
         // Ensure char boundary.
-        while end < n && !body.is_char_boundary(end) { end += 1; }
+        while end < n && !body.is_char_boundary(end) {
+            end += 1;
+        }
 
         let slice = &body[start..end];
         let trimmed = slice.trim();
-        if !trimmed.is_empty() { out.push(trimmed.to_string()); }
+        if !trimmed.is_empty() {
+            out.push(trimmed.to_string());
+        }
 
-        if end >= n { break; }
+        if end >= n {
+            break;
+        }
         let advance = (end - start).saturating_sub(overlap).max(1);
         start += advance;
-        while start < n && !body.is_char_boundary(start) { start += 1; }
+        while start < n && !body.is_char_boundary(start) {
+            start += 1;
+        }
     }
     out
 }
@@ -131,14 +148,20 @@ fn find_sentence_end(bytes: &[u8], from: usize, to: usize) -> Option<usize> {
 /// call per document.
 fn document_context(doc: &d365_automate_kb::Document) -> String {
     let body = doc.body.trim();
-    if body.is_empty() { return doc.title.clone(); }
+    if body.is_empty() {
+        return doc.title.clone();
+    }
     // Extract up to two sentences worth of content.
     let mut out = String::new();
     let mut sentence_count = 0;
     for ch in body.chars() {
         out.push(ch);
-        if matches!(ch, '.' | '!' | '?') { sentence_count += 1; }
-        if sentence_count >= 2 || out.len() >= 280 { break; }
+        if matches!(ch, '.' | '!' | '?') {
+            sentence_count += 1;
+        }
+        if sentence_count >= 2 || out.len() >= 280 {
+            break;
+        }
     }
     out.trim().to_string()
 }
@@ -148,9 +171,13 @@ fn find_space(bytes: &[u8], to: usize) -> Option<usize> {
     let mut i = to;
     while i > 0 {
         let c = bytes[i - 1];
-        if c == b' ' || c == b'\n' { return Some(i); }
+        if c == b' ' || c == b'\n' {
+            return Some(i);
+        }
         i -= 1;
-        if to - i > 200 { break; }
+        if to - i > 200 {
+            break;
+        }
     }
     None
 }
@@ -172,7 +199,9 @@ mod tests {
         doc.breadcrumbs = vec!["Finance".into(), "General Ledger".into()];
         let chunks = chunk_document(&doc, &ChunkerConfig::default());
         assert_eq!(chunks.len(), 1);
-        assert!(chunks[0].text.starts_with("Finance > General Ledger > Period-End Close\n"));
+        assert!(chunks[0]
+            .text
+            .starts_with("Finance > General Ledger > Period-End Close\n"));
     }
 
     #[test]
@@ -180,8 +209,14 @@ mod tests {
         let body = "Sentence one. ".repeat(200); // ~2800 chars
         let doc = Document::new("d:1", Domain::Learn, "u", "T", body);
         let chunks = chunk_document(&doc, &ChunkerConfig::default());
-        assert!(chunks.len() >= 2, "expected at least 2 chunks, got {}", chunks.len());
+        assert!(
+            chunks.len() >= 2,
+            "expected at least 2 chunks, got {}",
+            chunks.len()
+        );
         // Ordinals are dense.
-        for (i, c) in chunks.iter().enumerate() { assert_eq!(c.ordinal as usize, i); }
+        for (i, c) in chunks.iter().enumerate() {
+            assert_eq!(c.ordinal as usize, i);
+        }
     }
 }

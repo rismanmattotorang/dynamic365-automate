@@ -32,7 +32,10 @@ use tokio::time::interval;
 extern crate futures;
 
 #[derive(Parser)]
-#[command(name = "d365-automate-tui", about = "Operator TUI for the D365-Automate MCP server.")]
+#[command(
+    name = "d365-automate-tui",
+    about = "Operator TUI for the D365-Automate MCP server."
+)]
 struct Cli {
     /// Future: connect to a running server's admin endpoint.  Phase 4
     /// ships with a synthetic feed so the UI is exercisable offline.
@@ -63,7 +66,9 @@ async fn main() -> Result<()> {
     let mut traffic = traffic::Synthetic::new();
 
     let result = loop {
-        if let Err(e) = terminal.draw(|f| ui::draw(f, &app)) { break Err(e.into()); }
+        if let Err(e) = terminal.draw(|f| ui::draw(f, &app)) {
+            break Err(e.into());
+        }
 
         tokio::select! {
             _ = tick.tick() => {
@@ -99,7 +104,11 @@ async fn main() -> Result<()> {
     };
 
     disable_raw_mode()?;
-    execute!(terminal.backend_mut(), LeaveAlternateScreen, DisableMouseCapture)?;
+    execute!(
+        terminal.backend_mut(),
+        LeaveAlternateScreen,
+        DisableMouseCapture
+    )?;
     terminal.show_cursor()?;
     result
 }

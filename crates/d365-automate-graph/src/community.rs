@@ -53,7 +53,8 @@ pub fn detect_communities(g: &InMemoryGraph) -> Communities {
     }
 
     // 2. Pre-compute weighted degree per node.
-    let degree: HashMap<NodeId, f32> = sorted_nodes.iter()
+    let degree: HashMap<NodeId, f32> = sorted_nodes
+        .iter()
         .map(|e| {
             let mut neigh = g.undirected_neighbours(&e.id);
             neigh.sort_by(|a, b| a.0.cmp(&b.0));
@@ -66,7 +67,10 @@ pub fn detect_communities(g: &InMemoryGraph) -> Communities {
     if total_weight == 0.0 {
         // No edges — every node is its own community.
         let communities = build_communities_from_membership(g, &membership);
-        return Communities { communities, membership };
+        return Communities {
+            communities,
+            membership,
+        };
     }
 
     // 3. Repeated passes: for each node, move to the neighbour community
@@ -82,7 +86,9 @@ pub fn detect_communities(g: &InMemoryGraph) -> Communities {
             let cur_comm = membership[node];
             let mut neighbours = g.undirected_neighbours(node);
             neighbours.sort_by(|a, b| a.0.cmp(&b.0));
-            if neighbours.is_empty() { continue; }
+            if neighbours.is_empty() {
+                continue;
+            }
 
             // For each candidate community (cur + each neighbour's
             // community), compute the modularity gain of switching.
@@ -99,7 +105,9 @@ pub fn detect_communities(g: &InMemoryGraph) -> Communities {
             // Σ_tot per community.
             let mut sigma_tot: HashMap<u32, f32> = HashMap::new();
             for n in &nodes {
-                if n == node { continue; }
+                if n == node {
+                    continue;
+                }
                 let c = membership[n];
                 *sigma_tot.entry(c).or_insert(0.0) += *degree.get(n).unwrap_or(&0.0);
             }
@@ -108,7 +116,9 @@ pub fn detect_communities(g: &InMemoryGraph) -> Communities {
             let mut cands: Vec<(u32, f32)> = to_comm.into_iter().collect();
             cands.sort_by_key(|(c, _)| *c);
             for (cand, k_i_to_c) in cands {
-                if cand == cur_comm { continue; }
+                if cand == cur_comm {
+                    continue;
+                }
                 let sigma_c = *sigma_tot.get(&cand).unwrap_or(&0.0);
                 // Δ Q ≈ [k_i_to_c / m] − [sigma_c * k_i / (2 m^2)]
                 let m = total_weight;
@@ -127,35 +137,54 @@ pub fn detect_communities(g: &InMemoryGraph) -> Communities {
 
     let communities = build_communities_from_membership(g, &membership);
     let renumbered = renumber(communities, &mut membership);
-    Communities { communities: renumbered, membership }
+    Communities {
+        communities: renumbered,
+        membership,
+    }
 }
 
-fn build_communities_from_membership(g: &InMemoryGraph, membership: &HashMap<NodeId, u32>) -> Vec<Community> {
+fn build_communities_from_membership(
+    g: &InMemoryGraph,
+    membership: &HashMap<NodeId, u32>,
+) -> Vec<Community> {
     let mut grouped: HashMap<u32, Vec<NodeId>> = HashMap::new();
     for (id, c) in membership {
         grouped.entry(*c).or_default().push(id.clone());
     }
-    grouped.into_iter().map(|(id, mut members)| {
-        members.sort();
-        // Summary: list the highest-degree members' labels.
-        let mut by_label: Vec<String> = members.iter()
-            .filter_map(|m| g.node(m).map(|e| e.label.clone()))
-            .collect();
-        by_label.sort();
-        by_label.dedup();
-        let summary = by_label.join(" · ");
-        Community { id, members, summary }
-    }).collect()
+    grouped
+        .into_iter()
+        .map(|(id, mut members)| {
+            members.sort();
+            // Summary: list the highest-degree members' labels.
+            let mut by_label: Vec<String> = members
+                .iter()
+                .filter_map(|m| g.node(m).map(|e| e.label.clone()))
+                .collect();
+            by_label.sort();
+            by_label.dedup();
+            let summary = by_label.join(" · ");
+            Community {
+                id,
+                members,
+                summary,
+            }
+        })
+        .collect()
 }
 
-fn renumber(mut communities: Vec<Community>, membership: &mut HashMap<NodeId, u32>) -> Vec<Community> {
+fn renumber(
+    mut communities: Vec<Community>,
+    membership: &mut HashMap<NodeId, u32>,
+) -> Vec<Community> {
     communities.sort_by_key(|c| std::cmp::Reverse(c.members.len()));
     let mut remap: HashMap<u32, u32> = HashMap::new();
     for (new_id, c) in communities.iter_mut().enumerate() {
         remap.insert(c.id, new_id as u32);
         c.id = new_id as u32;
     }
-    for v in membership.values_mut() { *v = remap[v]; }
+    for v in membership.values_mut() {
+        *v = remap[v];
+    }
     communities
 }
 
@@ -169,18 +198,30 @@ mod tests {
         let result = detect_communities(&g);
         // Single-pass Louvain on 25 nodes / 34 edges should produce
         // a small handful of communities, not one giant blob.
-        assert!(result.communities.len() >= 2 && result.communities.len() <= 12,
-            "expected 2..=12 communities, got {}", result.communities.len());
+        assert!(
+            result.communities.len() >= 2 && result.communities.len() <= 12,
+            "expected 2..=12 communities, got {}",
+            result.communities.len()
+        );
 
         // The GL cluster (job + class + concept + journal service + Learn
         // page) should not all be in 6 different communities.
-        let fi_nodes = ["xpp:GTFinPostJournal", "xpp:GTFinJournalPoster",
-                        "svc:LedgerGeneralJournalEntry", "concept:journal_entry",
-                        "concept:period_close", "learn:finance/period-close"];
-        let comms: std::collections::HashSet<u32> = fi_nodes.iter()
+        let fi_nodes = [
+            "xpp:GTFinPostJournal",
+            "xpp:GTFinJournalPoster",
+            "svc:LedgerGeneralJournalEntry",
+            "concept:journal_entry",
+            "concept:period_close",
+            "learn:finance/period-close",
+        ];
+        let comms: std::collections::HashSet<u32> = fi_nodes
+            .iter()
             .filter_map(|n| result.membership.get(*n).copied())
             .collect();
-        assert!(comms.len() <= 3,
-            "FI-related entities scattered across {} communities; algorithm is under-clustering", comms.len());
+        assert!(
+            comms.len() <= 3,
+            "FI-related entities scattered across {} communities; algorithm is under-clustering",
+            comms.len()
+        );
     }
 }

@@ -51,20 +51,46 @@ pub struct AuditEntry {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum AuditOutcome {
-    Ok { summary: String },
+    Ok {
+        summary: String,
+    },
     /// User declined an elicitation; no writes occurred.
-    Declined { reason: String },
+    Declined {
+        reason: String,
+    },
     /// Permission denied by read-only mode or authorization.
-    Denied { reason: String },
+    Denied {
+        reason: String,
+    },
     /// Error during execution.
-    Failed { code: i32, message: String },
+    Failed {
+        code: i32,
+        message: String,
+    },
 }
 
 impl AuditOutcome {
-    pub fn ok(summary: impl Into<String>) -> Self { Self::Ok { summary: summary.into() } }
-    pub fn declined(reason: impl Into<String>) -> Self { Self::Declined { reason: reason.into() } }
-    pub fn denied(reason: impl Into<String>) -> Self { Self::Denied { reason: reason.into() } }
-    pub fn failed(code: i32, message: impl Into<String>) -> Self { Self::Failed { code, message: message.into() } }
+    pub fn ok(summary: impl Into<String>) -> Self {
+        Self::Ok {
+            summary: summary.into(),
+        }
+    }
+    pub fn declined(reason: impl Into<String>) -> Self {
+        Self::Declined {
+            reason: reason.into(),
+        }
+    }
+    pub fn denied(reason: impl Into<String>) -> Self {
+        Self::Denied {
+            reason: reason.into(),
+        }
+    }
+    pub fn failed(code: i32, message: impl Into<String>) -> Self {
+        Self::Failed {
+            code,
+            message: message.into(),
+        }
+    }
 }
 
 #[async_trait]
@@ -78,7 +104,9 @@ pub struct AuditLog {
 }
 
 impl AuditLog {
-    pub fn new(sink: Arc<dyn AuditSink>) -> Self { Self { sink } }
+    pub fn new(sink: Arc<dyn AuditSink>) -> Self {
+        Self { sink }
+    }
 
     /// Record an entry.  Arguments are redacted before being passed
     /// to the sink — secrets/PII never reach the sink raw.
@@ -88,12 +116,18 @@ impl AuditLog {
     }
 
     pub fn now_ms() -> u64 {
-        SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0)
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0)
     }
 
     pub fn new_event_id() -> String {
         // Hash the current epoch nanos with a tiny rotor for uniqueness.
-        let now = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
         format!("evt-{:016x}", now)
     }
 }
@@ -102,8 +136,15 @@ impl AuditLog {
 /// against the redaction list.
 pub fn redact(value: serde_json::Value) -> serde_json::Value {
     const SENSITIVE_SUBSTRINGS: &[&str] = &[
-        "password", "passwd", "secret", "token", "api_key", "apikey",
-        "_pwd", "_pass", "credential",
+        "password",
+        "passwd",
+        "secret",
+        "token",
+        "api_key",
+        "apikey",
+        "_pwd",
+        "_pass",
+        "credential",
     ];
     match value {
         serde_json::Value::Object(mut m) => {
@@ -135,11 +176,17 @@ pub struct JsonStderrSink {
 }
 
 impl Default for JsonStderrSink {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl JsonStderrSink {
-    pub fn new() -> Self { Self { inner: tokio::sync::Mutex::new(Vec::new()) } }
+    pub fn new() -> Self {
+        Self {
+            inner: tokio::sync::Mutex::new(Vec::new()),
+        }
+    }
     pub async fn drain(&self) -> Vec<AuditEntry> {
         std::mem::take(&mut *self.inner.lock().await)
     }
@@ -209,7 +256,8 @@ mod tests {
             arguments_redacted: serde_json::json!({ "vendor": "V-100", "password": "x" }),
             outcome: AuditOutcome::ok("po created"),
             duration_ms: 42,
-        }).await;
+        })
+        .await;
         let drained = sink.drain().await;
         assert_eq!(drained.len(), 1);
         let e = &drained[0];
@@ -225,13 +273,16 @@ mod tests {
         log.record(AuditEntry {
             event_id: AuditLog::new_event_id(),
             at_ms: AuditLog::now_ms(),
-            session_id: None, tenant: None, actor: None,
+            session_id: None,
+            tenant: None,
+            actor: None,
             tool: "d365.service.call".into(),
             environment: None,
             arguments_redacted: serde_json::json!({}),
             outcome: AuditOutcome::declined("user declined elicitation"),
             duration_ms: 1,
-        }).await;
+        })
+        .await;
         let drained = sink.drain().await;
         assert!(matches!(drained[0].outcome, AuditOutcome::Declined { .. }));
     }

@@ -24,6 +24,12 @@ pub mod error;
 pub mod mock;
 pub mod types;
 
+#[cfg(feature = "http")]
+pub mod http;
+
+#[cfg(feature = "http")]
+pub use http::{load_connection, HttpMetadataClient};
+
 pub use client::{MetaCallContext, MetadataClient};
 pub use connection::{D365Auth, D365Connection};
 pub use error::{MetaError, MetaErrorCode, MetaResult};

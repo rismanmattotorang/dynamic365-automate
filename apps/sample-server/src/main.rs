@@ -4,8 +4,8 @@
 //! domain code in the way.
 
 use mcp_core::{CallToolResult, ToolInputSchema};
-use mcp_server::{Server, registry::ToolFn};
 use mcp_server::ToolDescriptor;
+use mcp_server::{registry::ToolFn, Server};
 use mcp_transport::StdioTransport;
 use serde::Deserialize;
 use std::sync::Arc;
@@ -14,7 +14,9 @@ use tracing_subscriber::EnvFilter;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
+        .with_env_filter(
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
+        )
         .with_writer(std::io::stderr)
         .init();
 
@@ -29,7 +31,9 @@ async fn main() -> anyhow::Result<()> {
 }
 
 #[derive(Deserialize)]
-struct EchoArgs { text: String }
+struct EchoArgs {
+    text: String,
+}
 
 fn echo_tool() -> ToolDescriptor {
     let schema = ToolInputSchema::from_value(serde_json::json!({
@@ -44,11 +48,19 @@ fn echo_tool() -> ToolDescriptor {
         };
         Ok(CallToolResult::text(parsed.text))
     });
-    ToolDescriptor::new("echo", Some("Echo text back".into()), schema, Arc::new(handler))
+    ToolDescriptor::new(
+        "echo",
+        Some("Echo text back".into()),
+        schema,
+        Arc::new(handler),
+    )
 }
 
 #[derive(Deserialize)]
-struct AddArgs { a: f64, b: f64 }
+struct AddArgs {
+    a: f64,
+    b: f64,
+}
 
 fn add_tool() -> ToolDescriptor {
     let schema = ToolInputSchema::from_value(serde_json::json!({
@@ -66,5 +78,10 @@ fn add_tool() -> ToolDescriptor {
         };
         Ok(CallToolResult::text(format!("{}", parsed.a + parsed.b)))
     });
-    ToolDescriptor::new("add", Some("Add two numbers".into()), schema, Arc::new(handler))
+    ToolDescriptor::new(
+        "add",
+        Some("Add two numbers".into()),
+        schema,
+        Arc::new(handler),
+    )
 }

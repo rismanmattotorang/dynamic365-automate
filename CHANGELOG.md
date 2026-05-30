@@ -10,6 +10,44 @@ GaussianTech. See [`PORTING.md`](PORTING.md) for the phased strategy.
 
 ---
 
+## [0.9.0] — 2026-05-30 · Live HTTP transports (Phase 3b)
+
+Implements the live Dynamics 365 clients behind the `http` feature; the server
+now connects to a real environment when configured, falling back to the mocks.
+
+### Added — `d365-automate-odata` (feature `http`)
+
+- `HttpD365Client` — live F&O OData v4 client implementing `D365Client` over
+  **Microsoft Entra ID** OAuth2 client-credentials (token cache + refresh).
+  Entity reads build `$select` / `$filter` / `$top` with automatic `dataAreaId`
+  injection and `like`→`contains` translation; unbound OData actions POST to
+  `/data/<operation>`; structured HTTP-status→`D365Error` mapping. Metadata,
+  search, and entity structure are served from the curated catalogue.
+- `HttpD365Config` (`from_credentials` / `from_env`), secret-redacting `Debug`.
+
+### Added — `d365-automate-meta` (feature `http`)
+
+- `HttpMetadataClient` — live Metadata API client implementing `MetadataClient`
+  over `/metadata` + `/data` with Entra auth (bearer or client-credentials).
+- `load_connection` — TOML connection-file loader (search path:
+  `$D365_AUTOMATE_CONNECTION_DIR`, `./.d365-automate/connections`,
+  `~/.config/d365-automate/connections`). `deploy` is gated and directs to LCS.
+
+### Changed
+
+- `apps/d365-automate-server` selects the backend at runtime: live
+  `HttpD365Client` when `D365_RESOURCE` is set, live `HttpMetadataClient` when
+  `--connection` resolves to a non-mock file, otherwise the offline mocks.
+- CI now exercises the `http` feature (clippy + test).
+
+### Verified
+
+- `http`-feature builds + **56** unit tests pass (URL/query/`$batch`/token/error
+  builders, connection round-trip); clippy clean across `--all-targets`.
+- Live backend confirmed to activate via env (Entra OAuth2; secret redacted).
+
+---
+
 ## [0.8.0] — 2026-05-30 · Skills & docs (Phase 8)
 
 Rewrites the 13 agentic skills for Dynamics 365 and ports the docs.

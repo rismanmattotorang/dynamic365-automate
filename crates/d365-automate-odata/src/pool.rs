@@ -19,12 +19,19 @@ pub struct ConnectionPool {
 impl ConnectionPool {
     pub fn new(cap: usize) -> Self {
         let cap = cap.max(1);
-        Self { cap, sem: Arc::new(Semaphore::new(cap)) }
+        Self {
+            cap,
+            sem: Arc::new(Semaphore::new(cap)),
+        }
     }
 
-    pub fn cap(&self) -> usize { self.cap }
+    pub fn cap(&self) -> usize {
+        self.cap
+    }
 
-    pub fn available(&self) -> usize { self.sem.available_permits() }
+    pub fn available(&self) -> usize {
+        self.sem.available_permits()
+    }
 
     pub async fn acquire(&self) -> D365Result<OwnedSemaphorePermit> {
         Arc::clone(&self.sem)

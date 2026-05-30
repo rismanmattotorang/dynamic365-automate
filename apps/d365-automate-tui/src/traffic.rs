@@ -9,10 +9,17 @@ use d365_automate_rag::LatencyBreakdown;
 use std::time::Instant;
 
 const TOOLS: &[&str] = &[
-    "d365.docs.search", "d365.learn.search", "xpp.search",
-    "d365.service.search", "d365.service.metadata", "d365.env.info",
-    "d365.entity.read", "d365.entity.structure",
-    "xpp.meta.get_class", "xpp.meta.get_job", "xpp.meta.cross_reference",
+    "d365.docs.search",
+    "d365.learn.search",
+    "xpp.search",
+    "d365.service.search",
+    "d365.service.metadata",
+    "d365.env.info",
+    "d365.entity.read",
+    "d365.entity.structure",
+    "xpp.meta.get_class",
+    "xpp.meta.get_job",
+    "xpp.meta.cross_reference",
 ];
 
 pub struct Synthetic {
@@ -27,13 +34,19 @@ pub struct Synthetic {
 
 impl Synthetic {
     pub fn new() -> Self {
-        Self { started: Instant::now(), tick: 0, sessions: Vec::new() }
+        Self {
+            started: Instant::now(),
+            tick: 0,
+            sessions: Vec::new(),
+        }
     }
 
     /// Time elapsed since this synthetic feed started.  Used by the
     /// status bar when the admin-endpoint feed is wired in Phase 7.
     #[allow(dead_code)]
-    pub fn uptime(&self) -> std::time::Duration { self.started.elapsed() }
+    pub fn uptime(&self) -> std::time::Duration {
+        self.started.elapsed()
+    }
 
     pub fn tick(&mut self) -> Option<TrafficEvent> {
         self.tick += 1;
@@ -42,10 +55,16 @@ impl Synthetic {
             0 => {
                 let id = format!("S-{:04x}", self.tick % 0x10000);
                 self.sessions.push(id.clone());
-                Some(TrafficEvent::SessionOpen { id, client: "claude-code".into(), protocol: "2025-06-18".into() })
+                Some(TrafficEvent::SessionOpen {
+                    id,
+                    client: "claude-code".into(),
+                    protocol: "2025-06-18".into(),
+                })
             }
             5 if !self.sessions.is_empty() => {
-                let id = self.sessions.remove(self.tick as usize % self.sessions.len());
+                let id = self
+                    .sessions
+                    .remove(self.tick as usize % self.sessions.len());
                 Some(TrafficEvent::SessionClose { id })
             }
             7 => Some(TrafficEvent::KbStat {
@@ -76,7 +95,11 @@ impl Synthetic {
                 let total = self.tick.max(1);
                 let hits = ((total as f64 * 0.85).min((self.tick.saturating_sub(8)) as f64)) as u64;
                 let misses = total.saturating_sub(hits);
-                let hit_ratio = if total == 0 { 0.0 } else { hits as f64 / total as f64 };
+                let hit_ratio = if total == 0 {
+                    0.0
+                } else {
+                    hits as f64 / total as f64
+                };
                 Some(TrafficEvent::CacheStat {
                     hits,
                     misses,
@@ -104,7 +127,10 @@ impl Synthetic {
                 let idx = (self.tick as usize) % TOOLS.len();
                 let name = TOOLS[idx];
                 // Realistic latency: 80–250μs for RAG, 200μs–1ms for Metadata/OData.
-                let base = if name.starts_with("xpp.") || name.starts_with("d365.service") || name.starts_with("d365.entity") {
+                let base = if name.starts_with("xpp.")
+                    || name.starts_with("d365.service")
+                    || name.starts_with("d365.entity")
+                {
                     200 + (self.tick % 800)
                 } else {
                     100 + (self.tick % 150)
@@ -117,7 +143,9 @@ impl Synthetic {
                         rerank_us: 50 + (self.tick % 30),
                         total_us: base,
                     })
-                } else { None };
+                } else {
+                    None
+                };
                 Some(TrafficEvent::ToolCall {
                     name: name.into(),
                     latency_us: base,

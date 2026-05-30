@@ -36,7 +36,9 @@ pub struct ScheduledJob {
     pub enabled: bool,
 }
 
-fn default_true() -> bool { true }
+fn default_true() -> bool {
+    true
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
@@ -50,7 +52,11 @@ pub enum Schedule {
     /// Daily at HH:MM local time.
     Daily { hour: u32, minute: u32 },
     /// Weekly on a given weekday (1=Mon..7=Sun) at HH:MM.
-    Weekly { weekday: u32, hour: u32, minute: u32 },
+    Weekly {
+        weekday: u32,
+        hour: u32,
+        minute: u32,
+    },
     /// Quarterly on the Nth day of the quarter.
     Quarterly { day: u32, hour: u32, minute: u32 },
 }
@@ -69,7 +75,11 @@ impl Schedule {
             Schedule::Hourly { minute } => {
                 let m = (*minute as u64).min(59);
                 let now_min = (now_secs / 60) % 60;
-                let delta = if now_min < m { m - now_min } else { 60 - (now_min - m) };
+                let delta = if now_min < m {
+                    m - now_min
+                } else {
+                    60 - (now_min - m)
+                };
                 Duration::from_secs(delta * 60)
             }
             Schedule::Daily { hour, minute } => {
@@ -82,21 +92,33 @@ impl Schedule {
                 };
                 Duration::from_secs(delta)
             }
-            Schedule::Weekly { weekday, hour, minute } => {
+            Schedule::Weekly {
+                weekday,
+                hour,
+                minute,
+            } => {
                 // 1970-01-01 (Thu) → weekday math.  Treat epoch as
                 // weekday 4 (Thursday); shift accordingly.
                 let now_day = (now_secs / 86400 + 3) % 7 + 1; // 1..7
                 let target = (*weekday).clamp(1, 7) as u64;
                 let target_secs = (*hour as u64 * 3600 + *minute as u64 * 60) % 86400;
                 let now_in_day = now_secs % 86400;
-                let mut day_offset = if now_day <= target { target - now_day } else { 7 - (now_day - target) };
+                let mut day_offset = if now_day <= target {
+                    target - now_day
+                } else {
+                    7 - (now_day - target)
+                };
                 // If we're on the target day but past the hour, push by a week.
                 if day_offset == 0 && now_in_day >= target_secs {
                     day_offset = 7;
                 }
                 Duration::from_secs(day_offset * 86400 + target_secs.saturating_sub(now_in_day))
             }
-            Schedule::Quarterly { day, hour: _, minute: _ } => {
+            Schedule::Quarterly {
+                day,
+                hour: _,
+                minute: _,
+            } => {
                 // 90 days for the pilot — kept rough to avoid chrono.
                 // Production swaps for a real calendar.
                 let _ = day;
@@ -138,25 +160,38 @@ pub struct Scheduler {
 
 impl Scheduler {
     pub fn new(jobs: Vec<ScheduledJob>, executor: Arc<dyn JobExecutor>) -> Self {
-        let stats = SchedulerStats { jobs_declared: jobs.len(), ..SchedulerStats::default() };
-        Self { jobs, executor, stats: Mutex::new(stats) }
+        let stats = SchedulerStats {
+            jobs_declared: jobs.len(),
+            ..SchedulerStats::default()
+        };
+        Self {
+            jobs,
+            executor,
+            stats: Mutex::new(stats),
+        }
     }
 
     /// Parse a `scheduler.toml` file.  Expects `[[jobs]]` array tables.
     pub fn parse_config(toml_text: &str) -> Result<Vec<ScheduledJob>, String> {
         #[derive(Deserialize)]
-        struct Wrapper { #[serde(default)] jobs: Vec<ScheduledJob> }
+        struct Wrapper {
+            #[serde(default)]
+            jobs: Vec<ScheduledJob>,
+        }
         let w: Wrapper = toml::from_str(toml_text).map_err(|e| e.to_string())?;
         Ok(w.jobs)
     }
 
     pub async fn fire_once(&self, idx: usize) -> Option<ScheduleReport> {
         let job = self.jobs.get(idx)?.clone();
-        if !job.enabled { return None; }
+        if !job.enabled {
+            return None;
+        }
         let t0 = std::time::Instant::now();
         let fired_at_ms = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_millis() as u64).unwrap_or(0);
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0);
         let (ok, summary) = match self.executor.invoke(&job).await {
             Ok(s) => (true, s),
             Err(e) => (false, e),
@@ -165,14 +200,19 @@ impl Scheduler {
             job: job.name.clone(),
             fired_at_ms,
             duration_ms: t0.elapsed().as_millis() as u64,
-            ok, summary,
+            ok,
+            summary,
         };
         let mut s = self.stats.lock().await;
         s.fires += 1;
-        if !ok { s.errors += 1; }
+        if !ok {
+            s.errors += 1;
+        }
         s.last = Some(ScheduleReport {
-            job: report.job.clone(), fired_at_ms: report.fired_at_ms,
-            duration_ms: report.duration_ms, ok: report.ok,
+            job: report.job.clone(),
+            fired_at_ms: report.fired_at_ms,
+            duration_ms: report.duration_ms,
+            ok: report.ok,
             summary: report.summary.clone(),
         });
         Some(report)
@@ -183,7 +223,9 @@ impl Scheduler {
     pub async fn fire_all_now(&self) -> Vec<ScheduleReport> {
         let mut out = Vec::new();
         for i in 0..self.jobs.len() {
-            if let Some(r) = self.fire_once(i).await { out.push(r); }
+            if let Some(r) = self.fire_once(i).await {
+                out.push(r);
+            }
         }
         out
     }
@@ -191,15 +233,22 @@ impl Scheduler {
     pub async fn stats(&self) -> SchedulerStats {
         let s = self.stats.lock().await;
         SchedulerStats {
-            jobs_declared: s.jobs_declared, fires: s.fires, errors: s.errors,
+            jobs_declared: s.jobs_declared,
+            fires: s.fires,
+            errors: s.errors,
             last: s.last.as_ref().map(|r| ScheduleReport {
-                job: r.job.clone(), fired_at_ms: r.fired_at_ms,
-                duration_ms: r.duration_ms, ok: r.ok, summary: r.summary.clone(),
+                job: r.job.clone(),
+                fired_at_ms: r.fired_at_ms,
+                duration_ms: r.duration_ms,
+                ok: r.ok,
+                summary: r.summary.clone(),
             }),
         }
     }
 
-    pub fn jobs(&self) -> &[ScheduledJob] { &self.jobs }
+    pub fn jobs(&self) -> &[ScheduledJob] {
+        &self.jobs
+    }
 }
 
 #[cfg(test)]

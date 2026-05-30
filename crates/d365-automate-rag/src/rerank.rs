@@ -25,7 +25,9 @@ pub struct RerankedItem {
 }
 
 impl RerankedItem {
-    pub fn original_index(&self) -> Option<usize> { Some(self.idx) }
+    pub fn original_index(&self) -> Option<usize> {
+        Some(self.idx)
+    }
 }
 
 #[async_trait]
@@ -44,34 +46,54 @@ pub trait Reranker: Send + Sync {
 pub struct MockReranker;
 
 impl MockReranker {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 }
 
 impl Default for MockReranker {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[async_trait]
 impl Reranker for MockReranker {
     async fn rerank(&self, query: &str, candidates: &[RerankerCandidate]) -> Vec<RerankedItem> {
         let q_tokens: Vec<String> = tokens(query);
-        let q_identifiers: Vec<String> = q_tokens.iter()
+        let q_identifiers: Vec<String> = q_tokens
+            .iter()
             .filter(|t| t.len() >= 3 && t.chars().any(|c| c.is_uppercase() || c == '_'))
-            .cloned().collect();
+            .cloned()
+            .collect();
 
-        let mut scored: Vec<RerankedItem> = candidates.iter().enumerate().map(|(idx, c)| {
-            let body_tokens = tokens(&c.chunk_text);
-            let overlap = q_tokens.iter().filter(|t| body_tokens.contains(t)).count() as f32;
-            let ident_bonus = q_identifiers.iter().filter(|t| {
-                c.chunk_text.contains(t.as_str())
-                    || c.chunk_text.to_ascii_uppercase().contains(&t.to_ascii_uppercase())
-            }).count() as f32 * 0.5;
-            let pos_decay = 1.0 / (1.0 + idx as f32 * 0.05);
-            let score = overlap + ident_bonus + 0.1 * c.base_score + pos_decay;
-            RerankedItem { idx, score }
-        }).collect();
+        let mut scored: Vec<RerankedItem> = candidates
+            .iter()
+            .enumerate()
+            .map(|(idx, c)| {
+                let body_tokens = tokens(&c.chunk_text);
+                let overlap = q_tokens.iter().filter(|t| body_tokens.contains(t)).count() as f32;
+                let ident_bonus = q_identifiers
+                    .iter()
+                    .filter(|t| {
+                        c.chunk_text.contains(t.as_str())
+                            || c.chunk_text
+                                .to_ascii_uppercase()
+                                .contains(&t.to_ascii_uppercase())
+                    })
+                    .count() as f32
+                    * 0.5;
+                let pos_decay = 1.0 / (1.0 + idx as f32 * 0.05);
+                let score = overlap + ident_bonus + 0.1 * c.base_score + pos_decay;
+                RerankedItem { idx, score }
+            })
+            .collect();
 
-        scored.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        scored.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         scored
     }
 }
@@ -91,20 +113,40 @@ mod tests {
     async fn rerank_pushes_identifier_match_to_top() {
         let r = MockReranker::new();
         let candidates = vec![
-            RerankerCandidate { chunk_text: "Posting periods are managed via FiscalCalendarPeriod.".into(), base_score: 0.3 },
-            RerankerCandidate { chunk_text: "Generic finance prose without any tx code.".into(), base_score: 0.5 },
-            RerankerCandidate { chunk_text: "LedgerGeneralJournalEntry posts journal entries.".into(), base_score: 0.4 },
+            RerankerCandidate {
+                chunk_text: "Posting periods are managed via FiscalCalendarPeriod.".into(),
+                base_score: 0.3,
+            },
+            RerankerCandidate {
+                chunk_text: "Generic finance prose without any tx code.".into(),
+                base_score: 0.5,
+            },
+            RerankerCandidate {
+                chunk_text: "LedgerGeneralJournalEntry posts journal entries.".into(),
+                base_score: 0.4,
+            },
         ];
-        let order = r.rerank("How does LedgerGeneralJournalEntry work?", &candidates).await;
-        assert_eq!(order[0].idx, 2, "LedgerGeneralJournalEntry-mentioning chunk should top out");
+        let order = r
+            .rerank("How does LedgerGeneralJournalEntry work?", &candidates)
+            .await;
+        assert_eq!(
+            order[0].idx, 2,
+            "LedgerGeneralJournalEntry-mentioning chunk should top out"
+        );
     }
 
     #[tokio::test]
     async fn rerank_is_stable_for_equal_inputs() {
         let r = MockReranker::new();
         let candidates = vec![
-            RerankerCandidate { chunk_text: "ABC".into(), base_score: 0.5 },
-            RerankerCandidate { chunk_text: "DEF".into(), base_score: 0.5 },
+            RerankerCandidate {
+                chunk_text: "ABC".into(),
+                base_score: 0.5,
+            },
+            RerankerCandidate {
+                chunk_text: "DEF".into(),
+                base_score: 0.5,
+            },
         ];
         let order1 = r.rerank("query", &candidates).await;
         let order2 = r.rerank("query", &candidates).await;

@@ -61,7 +61,9 @@ pub struct InfologMessage {
 }
 
 impl InfologMessage {
-    pub fn is_failure(&self) -> bool { self.severity.is_failure() }
+    pub fn is_failure(&self) -> bool {
+        self.severity.is_failure()
+    }
 }
 
 /// Parse a JSON value into Infolog messages.  Accepts:
@@ -77,13 +79,16 @@ pub fn parse_infolog(value: &serde_json::Value) -> Vec<InfologMessage> {
 }
 
 fn walk(v: &serde_json::Value, out: &mut Vec<InfologMessage>, depth: usize) {
-    if depth > 8 { return; }
+    if depth > 8 {
+        return;
+    }
     match v {
         serde_json::Value::Object(map) => {
             // OData error payload: { "error": { "code", "message" } }.
             if let Some(err) = map.get("error").and_then(|e| e.as_object()) {
                 let code = first_str(err, &["code", "Code"]).unwrap_or_default();
-                let text = err.get("message")
+                let text = err
+                    .get("message")
                     .map(odata_message_text)
                     .unwrap_or_default();
                 out.push(InfologMessage {
@@ -96,10 +101,14 @@ fn walk(v: &serde_json::Value, out: &mut Vec<InfologMessage>, depth: usize) {
                 return;
             }
             // Infolog row: has a severity and a message/text.
-            let has_sev = map.contains_key("severity") || map.contains_key("Severity")
-                || map.contains_key("type") || map.contains_key("TYPE");
-            let has_msg = map.contains_key("message") || map.contains_key("Message")
-                || map.contains_key("text") || map.contains_key("MESSAGE");
+            let has_sev = map.contains_key("severity")
+                || map.contains_key("Severity")
+                || map.contains_key("type")
+                || map.contains_key("TYPE");
+            let has_msg = map.contains_key("message")
+                || map.contains_key("Message")
+                || map.contains_key("text")
+                || map.contains_key("MESSAGE");
             if has_sev && has_msg {
                 let sev = first_str(map, &["severity", "Severity", "type", "TYPE"])
                     .map(|s| InfologSeverity::parse(&s))
@@ -107,16 +116,21 @@ fn walk(v: &serde_json::Value, out: &mut Vec<InfologMessage>, depth: usize) {
                 out.push(InfologMessage {
                     severity: sev,
                     code: first_str(map, &["code", "Code", "ID", "id"]).unwrap_or_default(),
-                    text: first_str(map, &["message", "Message", "text", "MESSAGE"]).unwrap_or_default(),
+                    text: first_str(map, &["message", "Message", "text", "MESSAGE"])
+                        .unwrap_or_default(),
                     field: first_str(map, &["field", "Field", "FIELD", "target"]),
                     environment: first_str(map, &["environment", "system", "SYSTEM"]),
                 });
                 return;
             }
-            for v in map.values() { walk(v, out, depth + 1); }
+            for v in map.values() {
+                walk(v, out, depth + 1);
+            }
         }
         serde_json::Value::Array(arr) => {
-            for v in arr { walk(v, out, depth + 1); }
+            for v in arr {
+                walk(v, out, depth + 1);
+            }
         }
         _ => {}
     }
@@ -124,16 +138,24 @@ fn walk(v: &serde_json::Value, out: &mut Vec<InfologMessage>, depth: usize) {
 
 /// OData wraps `message` either as a plain string or `{ "value": "..." }`.
 fn odata_message_text(v: &serde_json::Value) -> String {
-    if let Some(s) = v.as_str() { return s.to_string(); }
-    if let Some(inner) = v.get("value").and_then(|x| x.as_str()) { return inner.to_string(); }
+    if let Some(s) = v.as_str() {
+        return s.to_string();
+    }
+    if let Some(inner) = v.get("value").and_then(|x| x.as_str()) {
+        return inner.to_string();
+    }
     v.to_string()
 }
 
 fn first_str(obj: &serde_json::Map<String, serde_json::Value>, keys: &[&str]) -> Option<String> {
     for k in keys {
         if let Some(v) = obj.get(*k) {
-            if let Some(s) = v.as_str() { return Some(s.to_string()); }
-            if v.is_number() { return Some(v.to_string()); }
+            if let Some(s) = v.as_str() {
+                return Some(s.to_string());
+            }
+            if v.is_number() {
+                return Some(v.to_string());
+            }
         }
     }
     None

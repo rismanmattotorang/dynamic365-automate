@@ -115,7 +115,9 @@ pub struct MetaSearchRequest {
     pub max_results: usize,
 }
 
-fn default_max_results() -> usize { 25 }
+fn default_max_results() -> usize {
+    25
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MetaSearchHit {

@@ -7,25 +7,27 @@
 //! exposes the gated write tools. The backends are held behind trait objects,
 //! so pointing at a live environment later is a one-site change (see lib.rs).
 
-use d365_automate_server_lib::{context::ServerContext, prompts, resources, seed, tools, register_completers};
+use d365_automate_server_lib::{
+    context::ServerContext, prompts, register_completers, resources, seed, tools,
+};
 
 use clap::Parser;
-use mcp_server::Server;
-use mcp_transport::{HttpServerConfig, HttpServerTransport, StdioTransport};
 use d365_automate_graph::InMemoryGraph;
 use d365_automate_ingest::{EmbeddingClient, MockEmbedder};
 use d365_automate_kb::{InMemoryKb, KnowledgeStore};
-use d365_automate_meta::{D365Connection, MetadataClient, MockMetadataClient};
-use d365_automate_observability::{
-    AuditEntry, AuditLog, AuditSink, MetricKind, MetricsRegistry,
+use d365_automate_meta::{
+    D365Auth, D365Connection, HttpMetadataClient, MetadataClient, MockMetadataClient,
 };
+use d365_automate_observability::{AuditEntry, AuditLog, AuditSink, MetricKind, MetricsRegistry};
 use d365_automate_odata::{
-    CredentialProvider, CredentialSource, Credentials, EnvCredentialProvider,
-    LayeredCredentialProvider, MetadataCache, MockD365Client, StaticCredentialProvider,
-    D365Client,
+    CredentialProvider, CredentialSource, Credentials, D365Client, EnvCredentialProvider,
+    HttpD365Client, LayeredCredentialProvider, MetadataCache, MockD365Client,
+    StaticCredentialProvider,
 };
 use d365_automate_rag::{GraphEngine, MockReranker, RagEngine};
 use d365_automate_skills::SkillRegistry;
+use mcp_server::Server;
+use mcp_transport::{HttpServerConfig, HttpServerTransport, StdioTransport};
 use std::sync::Arc;
 use std::time::Duration;
 use tracing_subscriber::EnvFilter;
@@ -34,7 +36,7 @@ use tracing_subscriber::EnvFilter;
 #[command(
     name = "d365-automate-server",
     about = "D365-Automate MCP server with Dynamics 365 OData/Metadata tools, resources, and prompts.",
-    version,
+    version
 )]
 struct Cli {
     /// Disable read-only safety; allow MCP tools to call write-side OData
@@ -96,7 +98,9 @@ impl AuditSink for TracingAuditSink {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
+        .with_env_filter(
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
+        )
         .with_writer(std::io::stderr)
         .init();
 
@@ -131,24 +135,55 @@ async fn main() -> anyhow::Result<()> {
             legal_entity: "USMF".into(),
             source: CredentialSource::Static,
         })));
-    let creds = creds_provider.fetch().await
+    let creds = creds_provider
+        .fetch()
+        .await
         .map_err(|e| anyhow::anyhow!("credential resolution failed: {e}"))?
         .ok_or_else(|| anyhow::anyhow!("no credentials available"))?;
     tracing::info!(identity = %creds.redacted(), "Dynamics 365 identity resolved");
 
-    // ── Dynamics 365 backends (mock today; live HttpD365Client swaps in here
-    //    once Phase 3b lands — same Arc<dyn …> assignment, no tool changes). ──
-    let inner = MockD365Client::new(cli.pool_size, creds.redacted());
+    // ── Dynamics 365 OData backend ──────────────────────────────────────
+    // Live `HttpD365Client` when `D365_RESOURCE` is set (Entra OAuth2);
+    // otherwise the offline mock decorated with a TTL metadata cache.
     let cache_ttl = Duration::from_secs(cli.metadata_cache_ttl_secs);
-    let metadata_cache = MetadataCache::new(inner.clone(), cache_ttl);
-    let d365_client: Arc<dyn D365Client> = metadata_cache.clone();
-    tracing::info!(cache_ttl_secs = cli.metadata_cache_ttl_secs, "service-metadata cache active");
-
-    let connection = match &cli.connection {
-        Some(name) => D365Connection::mock(name.clone()), // live loader lands in Phase 3b
-        None => D365Connection::mock("default"),
+    let (d365_client, metadata_cache): (
+        Arc<dyn D365Client>,
+        Option<Arc<MetadataCache<MockD365Client>>>,
+    ) = match HttpD365Client::from_env() {
+        Some(Ok(live)) => {
+            tracing::info!(resource = %live.config().resource, "live Dynamics 365 OData backend (Entra OAuth2)");
+            (live, None)
+        }
+        Some(Err(e)) => return Err(anyhow::anyhow!("live D365 client init failed: {e}")),
+        None => {
+            let inner = MockD365Client::new(cli.pool_size, creds.redacted());
+            let cache = MetadataCache::new(inner.clone(), cache_ttl);
+            tracing::info!(
+                cache_ttl_secs = cli.metadata_cache_ttl_secs,
+                "offline mock OData backend (service-metadata cache active)"
+            );
+            (cache.clone(), Some(cache))
+        }
     };
-    let meta_client: Arc<dyn MetadataClient> = MockMetadataClient::new(connection);
+
+    // ── Metadata (X++ / AOT) backend ────────────────────────────────────
+    // Live `HttpMetadataClient` when `--connection <name>` resolves to a
+    // non-mock connection file; otherwise the offline mock.
+    let meta_client: Arc<dyn MetadataClient> = match &cli.connection {
+        Some(name) => match d365_automate_meta::load_connection(name) {
+            Ok(conn) if !matches!(conn.auth, D365Auth::Mock) => {
+                tracing::info!(connection = %name, "live Dynamics 365 Metadata backend");
+                HttpMetadataClient::new(conn)
+                    .map_err(|e| anyhow::anyhow!("live metadata client init failed: {e}"))?
+            }
+            Ok(conn) => MockMetadataClient::new(conn),
+            Err(e) => {
+                tracing::warn!(connection = %name, error = %e, "connection not found; using mock metadata backend");
+                MockMetadataClient::new(D365Connection::mock(name.clone()))
+            }
+        },
+        None => MockMetadataClient::new(D365Connection::mock("default")),
+    };
 
     let agents_md = load_agents_md(cli.agents_md.as_deref()).await;
 
@@ -169,7 +204,7 @@ async fn main() -> anyhow::Result<()> {
         graph: graph_engine,
         embedder,
         d365_client,
-        metadata_cache: Some(metadata_cache),
+        metadata_cache,
         meta_client,
         read_only,
         agents_md: agents_md.clone(),
@@ -187,28 +222,62 @@ async fn main() -> anyhow::Result<()> {
 
     match cli.transport.as_str() {
         "stdio" => {
-            let (reader, writer) = StdioTransport::new(
-                tokio::io::stdin(), tokio::io::stdout(),
-            ).into_parts();
+            let (reader, writer) =
+                StdioTransport::new(tokio::io::stdin(), tokio::io::stdout()).into_parts();
             server.run_stdio(reader, writer).await?
         }
         "http" => {
-            let bind: std::net::SocketAddr = cli.bind.parse()
+            let bind: std::net::SocketAddr = cli
+                .bind
+                .parse()
                 .map_err(|e| anyhow::anyhow!("invalid --bind '{}': {e}", cli.bind))?;
             tracing::info!(bind = %bind, "HTTP transport binding");
 
             let metrics = Arc::new(MetricsRegistry::new());
-            metrics.register("mcp_tool_latency_seconds", MetricKind::Histogram, "Per-tool call latency in seconds");
-            metrics.register("mcp_tool_calls_total", MetricKind::Counter, "Total MCP tool invocations");
-            metrics.register("mcp_tool_errors_total", MetricKind::Counter, "Total MCP tool invocations that returned isError=true");
-            metrics.register("rag_retrieval_latency_seconds", MetricKind::Histogram, "RAG retrieval latency");
-            metrics.register("kb_chunks_total", MetricKind::Gauge, "Total chunks currently indexed");
-            metrics.register("d365_pool_in_use", MetricKind::Gauge, "Dynamics 365 connection pool slots currently in use");
-            metrics.register("d365_authz_denied_total", MetricKind::Counter, "Calls denied by the read-only safety gate");
-            metrics.register("d365_service_calls_total", MetricKind::Counter, "OData operations dispatched, grouped by operation and outcome");
+            metrics.register(
+                "mcp_tool_latency_seconds",
+                MetricKind::Histogram,
+                "Per-tool call latency in seconds",
+            );
+            metrics.register(
+                "mcp_tool_calls_total",
+                MetricKind::Counter,
+                "Total MCP tool invocations",
+            );
+            metrics.register(
+                "mcp_tool_errors_total",
+                MetricKind::Counter,
+                "Total MCP tool invocations that returned isError=true",
+            );
+            metrics.register(
+                "rag_retrieval_latency_seconds",
+                MetricKind::Histogram,
+                "RAG retrieval latency",
+            );
+            metrics.register(
+                "kb_chunks_total",
+                MetricKind::Gauge,
+                "Total chunks currently indexed",
+            );
+            metrics.register(
+                "d365_pool_in_use",
+                MetricKind::Gauge,
+                "Dynamics 365 connection pool slots currently in use",
+            );
+            metrics.register(
+                "d365_authz_denied_total",
+                MetricKind::Counter,
+                "Calls denied by the read-only safety gate",
+            );
+            metrics.register(
+                "d365_service_calls_total",
+                MetricKind::Counter,
+                "OData operations dispatched, grouped by operation and outcome",
+            );
 
             let metrics_for_render = Arc::clone(&metrics);
-            let render: mcp_transport::http::MetricsRenderFn = Arc::new(move || metrics_for_render.render());
+            let render: mcp_transport::http::MetricsRenderFn =
+                Arc::new(move || metrics_for_render.render());
 
             let dispatch_server = server.clone();
             let handle = HttpServerTransport::serve(
@@ -222,8 +291,11 @@ async fn main() -> anyhow::Result<()> {
                     let server = dispatch_server.clone();
                     async move { server.dispatch_message(msg).await }
                 },
-            ).await?;
-            tracing::info!("HTTP server ready at http://{bind}/mcp  (events: /mcp/events, metrics: /metrics)");
+            )
+            .await?;
+            tracing::info!(
+                "HTTP server ready at http://{bind}/mcp  (events: /mcp/events, metrics: /metrics)"
+            );
             tokio::signal::ctrl_c().await?;
             handle.shutdown().await;
         }
@@ -251,13 +323,27 @@ fn build_server(
         .exposure(policy)
         .instructions(instructions);
 
-    for desc in tools::rag_tools(&ctx) { builder = builder.tool(desc); }
-    for desc in tools::service_tools(&ctx) { builder = builder.tool(desc); }
-    for desc in tools::meta_tools(&ctx) { builder = builder.tool(desc); }
-    for desc in tools::graph_tools(&ctx) { builder = builder.tool(desc); }
-    for desc in tools::workflow_tools(&ctx) { builder = builder.tool(desc); }
-    for desc in resources::all(&ctx) { builder = builder.resource(desc); }
-    for desc in prompts::all(skills) { builder = builder.prompt(desc); }
+    for desc in tools::rag_tools(&ctx) {
+        builder = builder.tool(desc);
+    }
+    for desc in tools::service_tools(&ctx) {
+        builder = builder.tool(desc);
+    }
+    for desc in tools::meta_tools(&ctx) {
+        builder = builder.tool(desc);
+    }
+    for desc in tools::graph_tools(&ctx) {
+        builder = builder.tool(desc);
+    }
+    for desc in tools::workflow_tools(&ctx) {
+        builder = builder.tool(desc);
+    }
+    for desc in resources::all(&ctx) {
+        builder = builder.resource(desc);
+    }
+    for desc in prompts::all(skills) {
+        builder = builder.prompt(desc);
+    }
     builder = register_completers(builder);
     builder.build()
 }
@@ -275,7 +361,9 @@ fn dirs_config_path(suffix: &str) -> std::path::PathBuf {
 async fn load_agents_md(explicit_path: Option<&str>) -> Option<String> {
     let path = explicit_path.map(|p| p.to_string()).or_else(|| {
         let default = "AGENTS.md";
-        std::path::Path::new(default).exists().then(|| default.to_string())
+        std::path::Path::new(default)
+            .exists()
+            .then(|| default.to_string())
     })?;
     match tokio::fs::read_to_string(&path).await {
         Ok(s) => {

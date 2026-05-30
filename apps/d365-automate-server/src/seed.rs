@@ -16,13 +16,20 @@ pub async fn populate_with_embeddings(
 
     for doc in docs {
         let mut chunks = chunk_document(&doc, &chunker);
-        if chunks.is_empty() { continue; }
+        if chunks.is_empty() {
+            continue;
+        }
         let texts: Vec<String> = chunks.iter().map(|c| c.text.clone()).collect();
         let vectors = embedder.embed(&texts).await?;
         for (chunk, vec) in chunks.iter_mut().zip(vectors.into_iter()) {
             chunk.embedding = Some(vec);
         }
-        store.upsert(UpsertBatch { documents: vec![doc], chunks }).await?;
+        store
+            .upsert(UpsertBatch {
+                documents: vec![doc],
+                chunks,
+            })
+            .await?;
     }
     Ok(())
 }
@@ -81,7 +88,9 @@ fn seed_documents() -> Vec<Document> {
     });
 
     out.push(Document::new(
-        "solution:FIN-CORE", Domain::Solution, "solution://FIN-CORE",
+        "solution:FIN-CORE",
+        Domain::Solution,
+        "solution://FIN-CORE",
         "Dynamics 365 Finance",
         "Solution fact sheet for the Dynamics 365 Finance module (FIN-CORE). Lifecycle: active. \
          Capabilities: general ledger, accounts payable, accounts receivable, fixed assets. \
@@ -89,7 +98,9 @@ fn seed_documents() -> Vec<Document> {
     ));
 
     out.push(Document::new(
-        "solution:LEGACY-BILL", Domain::Solution, "solution://LEGACY-BILL",
+        "solution:LEGACY-BILL",
+        Domain::Solution,
+        "solution://LEGACY-BILL",
         "Legacy Billing Engine",
         "Solution fact sheet for the Legacy Billing Engine (LEGACY-BILL). Lifecycle: phase-out. \
          Integrations: mainframe. EOL: 2026-09. Replacement: Dynamics 365 Sales/Finance billing.",

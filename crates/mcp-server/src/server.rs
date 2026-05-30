@@ -39,7 +39,10 @@ pub struct ServerBuilder {
 impl ServerBuilder {
     pub fn new(name: impl Into<String>, version: impl Into<String>) -> Self {
         Self {
-            info: Implementation { name: name.into(), version: version.into() },
+            info: Implementation {
+                name: name.into(),
+                version: version.into(),
+            },
             instructions: None,
             tools: HashMap::new(),
             resources: HashMap::new(),
@@ -54,7 +57,12 @@ impl ServerBuilder {
     /// MCP 2025-06-18 completion utility (`completion/complete`).
     /// The closure receives `(typed_prefix, full_typed_value)` for the
     /// argument and returns the candidate strings.
-    pub fn completer<F>(mut self, prompt_name: impl Into<String>, argument: impl Into<String>, f: F) -> Self
+    pub fn completer<F>(
+        mut self,
+        prompt_name: impl Into<String>,
+        argument: impl Into<String>,
+        f: F,
+    ) -> Self
     where
         F: Fn(&str, &str) -> Vec<String> + Send + Sync + 'static,
     {
@@ -108,12 +116,14 @@ impl ServerBuilder {
     }
 
     pub fn resource(mut self, descriptor: ResourceDescriptor) -> Self {
-        self.resources.insert(descriptor.resource.uri.clone(), descriptor);
+        self.resources
+            .insert(descriptor.resource.uri.clone(), descriptor);
         self
     }
 
     pub fn prompt(mut self, descriptor: PromptDescriptor) -> Self {
-        self.prompts.insert(descriptor.prompt.name.clone(), descriptor);
+        self.prompts
+            .insert(descriptor.prompt.name.clone(), descriptor);
         self
     }
 
@@ -122,7 +132,9 @@ impl ServerBuilder {
         // call_tool both see the same surface — preventing the agent from
         // discovering a tool that would then be refused.
         let policy = self.exposure;
-        let allowed_tools: HashMap<String, ToolDescriptor> = self.tools.into_iter()
+        let allowed_tools: HashMap<String, ToolDescriptor> = self
+            .tools
+            .into_iter()
             .filter(|(_, d)| d.is_allowed_by(policy))
             .collect();
         Server {
@@ -177,12 +189,20 @@ impl ServerContext {
             Some(serde_json::Value::Object(Default::default()))
         };
         let mut extra: serde_json::Map<String, serde_json::Value> = Default::default();
-        if let Some(c) = completions { extra.insert("completions".into(), c); }
+        if let Some(c) = completions {
+            extra.insert("completions".into(), c);
+        }
         ServerCapabilities {
-            tools: (!self.tools.is_empty()).then_some(ToolsCapability { list_changed: false }),
-            resources: (!self.resources.is_empty())
-                .then_some(ResourcesCapability { list_changed: false, subscribe: false }),
-            prompts: (!self.prompts.is_empty()).then_some(PromptsCapability { list_changed: false }),
+            tools: (!self.tools.is_empty()).then_some(ToolsCapability {
+                list_changed: false,
+            }),
+            resources: (!self.resources.is_empty()).then_some(ResourcesCapability {
+                list_changed: false,
+                subscribe: false,
+            }),
+            prompts: (!self.prompts.is_empty()).then_some(PromptsCapability {
+                list_changed: false,
+            }),
             logging,
             extra,
         }
@@ -213,14 +233,17 @@ impl Server {
         ServerBuilder::new(name, version)
     }
 
-    pub fn context(&self) -> &Arc<ServerContext> { &self.context }
+    pub fn context(&self) -> &Arc<ServerContext> {
+        &self.context
+    }
 
     /// Dispatch a single message and return the response (if any).
     /// Notifications and responses return `None`; requests return `Some`.
     /// Used by transports that own message buffering (one-shot HTTP).
     /// No elicitation support — see `dispatch_message_with` for that.
     pub async fn dispatch_message(&self, message: Message) -> Option<Message> {
-        self.dispatch_message_with(message, crate::elicit::ElicitationHandle::disabled()).await
+        self.dispatch_message_with(message, crate::elicit::ElicitationHandle::disabled())
+            .await
     }
 
     /// Dispatch with an explicit `ElicitationHandle`.  Tools that call
@@ -298,19 +321,21 @@ impl Server {
 
         let (inbound_tx, mut inbound_rx) = mpsc::channel::<Message>(64);
         let (outbound_tx, mut outbound_rx) = mpsc::channel::<Message>(64);
-        let elicit_handle = crate::elicit::ElicitationHandle::new(
-            outbound_tx.clone(),
-            true,
-        );
+        let elicit_handle = crate::elicit::ElicitationHandle::new(outbound_tx.clone(), true);
 
         let reader_task = tokio::spawn(async move {
             loop {
                 match reader.recv().await {
                     Ok(Some(msg)) => {
-                        if inbound_tx.send(msg).await.is_err() { break; }
+                        if inbound_tx.send(msg).await.is_err() {
+                            break;
+                        }
                     }
                     Ok(None) => break,
-                    Err(e) => { warn!(error = %e, "transport recv failed"); break; }
+                    Err(e) => {
+                        warn!(error = %e, "transport recv failed");
+                        break;
+                    }
                 }
             }
         });
@@ -386,64 +411,89 @@ impl Server {
             methods::PING => Ok(serde_json::json!({})),
             methods::TOOLS_LIST => {
                 let result = ListToolsResult {
-                    tools: self.context.tools.values().map(|d| d.tool.clone()).collect(),
+                    tools: self
+                        .context
+                        .tools
+                        .values()
+                        .map(|d| d.tool.clone())
+                        .collect(),
                     next_cursor: None,
                 };
                 Ok(serde_json::to_value(result)?)
             }
             methods::TOOLS_CALL => {
                 let params: CallToolParams = parse_params(req.params.clone())?;
-                let descriptor = self
-                    .context
-                    .tools
-                    .get(&params.name)
-                    .ok_or_else(|| Error::protocol(ErrorCode::UnknownTool, format!("unknown tool '{}'", params.name)))?;
-                let args = params.arguments.unwrap_or(Value::Object(Default::default()));
-                let result = descriptor.handler.call(args).await.unwrap_or_else(|e| {
-                    CallToolResult {
-                        content: vec![ToolContent::text(e.to_string())],
-                        is_error: true,
-                    }
-                });
+                let descriptor = self.context.tools.get(&params.name).ok_or_else(|| {
+                    Error::protocol(
+                        ErrorCode::UnknownTool,
+                        format!("unknown tool '{}'", params.name),
+                    )
+                })?;
+                let args = params
+                    .arguments
+                    .unwrap_or(Value::Object(Default::default()));
+                let result =
+                    descriptor
+                        .handler
+                        .call(args)
+                        .await
+                        .unwrap_or_else(|e| CallToolResult {
+                            content: vec![ToolContent::text(e.to_string())],
+                            is_error: true,
+                        });
                 Ok(serde_json::to_value(result)?)
             }
             methods::RESOURCES_LIST => {
                 let result = ListResourcesResult {
-                    resources: self.context.resources.values().map(|d| d.resource.clone()).collect(),
+                    resources: self
+                        .context
+                        .resources
+                        .values()
+                        .map(|d| d.resource.clone())
+                        .collect(),
                     next_cursor: None,
                 };
                 Ok(serde_json::to_value(result)?)
             }
             methods::RESOURCES_READ => {
                 let params: ReadResourceParams = parse_params(req.params.clone())?;
-                let descriptor = self
-                    .context
-                    .resources
-                    .get(&params.uri)
-                    .ok_or_else(|| Error::protocol(ErrorCode::InvalidParams, format!("unknown resource '{}'", params.uri)))?;
+                let descriptor = self.context.resources.get(&params.uri).ok_or_else(|| {
+                    Error::protocol(
+                        ErrorCode::InvalidParams,
+                        format!("unknown resource '{}'", params.uri),
+                    )
+                })?;
                 let result: ReadResourceResult = descriptor.handler.read(&params.uri).await?;
                 Ok(serde_json::to_value(result)?)
             }
             methods::PROMPTS_LIST => {
                 let result = ListPromptsResult {
-                    prompts: self.context.prompts.values().map(|d| d.prompt.clone()).collect(),
+                    prompts: self
+                        .context
+                        .prompts
+                        .values()
+                        .map(|d| d.prompt.clone())
+                        .collect(),
                     next_cursor: None,
                 };
                 Ok(serde_json::to_value(result)?)
             }
             methods::PROMPTS_GET => {
                 let params: GetPromptParams = parse_params(req.params.clone())?;
-                let descriptor = self
-                    .context
-                    .prompts
-                    .get(&params.name)
-                    .ok_or_else(|| Error::protocol(ErrorCode::InvalidParams, format!("unknown prompt '{}'", params.name)))?;
+                let descriptor = self.context.prompts.get(&params.name).ok_or_else(|| {
+                    Error::protocol(
+                        ErrorCode::InvalidParams,
+                        format!("unknown prompt '{}'", params.name),
+                    )
+                })?;
                 let result: GetPromptResult = descriptor.handler.get(params.arguments).await?;
                 Ok(serde_json::to_value(result)?)
             }
             methods::LOGGING_SET_LEVEL => {
                 let params: SetLevelParams = parse_params(req.params.clone())?;
-                self.context.log_level.store(params.level.rank(), Ordering::Relaxed);
+                self.context
+                    .log_level
+                    .store(params.level.rank(), Ordering::Relaxed);
                 debug!(level = ?params.level, "logging/setLevel applied");
                 Ok(serde_json::json!({}))
             }
@@ -454,7 +504,10 @@ impl Server {
                     CompletionRef::Resource { uri } => {
                         // Resource templates aren't surfaced as completers
                         // here.  Empty list is the spec-compliant fallback.
-                        debug!(uri, "completion for resource template — returning empty list");
+                        debug!(
+                            uri,
+                            "completion for resource template — returning empty list"
+                        );
                         return Ok(serde_json::to_value(CompleteResult {
                             completion: CompletionData::default(),
                         })?);
@@ -481,16 +534,18 @@ impl Server {
                     },
                 })?)
             }
-            other => Err(Error::protocol(ErrorCode::MethodNotFound, format!("method '{}' not supported", other))),
+            other => Err(Error::protocol(
+                ErrorCode::MethodNotFound,
+                format!("method '{}' not supported", other),
+            )),
         }
     }
 }
 
 fn parse_params<T: serde::de::DeserializeOwned>(params: Option<Value>) -> Result<T> {
     let value = params.unwrap_or(Value::Object(Default::default()));
-    serde_json::from_value(value).map_err(|e| {
-        Error::protocol(ErrorCode::InvalidParams, format!("invalid params: {e}"))
-    })
+    serde_json::from_value(value)
+        .map_err(|e| Error::protocol(ErrorCode::InvalidParams, format!("invalid params: {e}")))
 }
 
 fn select_protocol_version(client: &str) -> String {

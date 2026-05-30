@@ -51,7 +51,10 @@ pub fn parse_learn_html(raw: &str) -> Result<ParsedPage, CrawlError> {
         return Err(CrawlError::Parse("missing title".into()));
     }
 
-    let breadcrumbs = collect_text(&doc, "nav.breadcrumb a, .breadcrumb li, [data-breadcrumb] a");
+    let breadcrumbs = collect_text(
+        &doc,
+        "nav.breadcrumb a, .breadcrumb li, [data-breadcrumb] a",
+    );
     let breadcrumbs = breadcrumbs
         .into_iter()
         .map(|s| s.trim().to_string())
@@ -70,23 +73,34 @@ pub fn parse_learn_html(raw: &str) -> Result<ParsedPage, CrawlError> {
 
     let module = pick_meta(&doc, "module");
 
-    Ok(ParsedPage { title, breadcrumbs, body, module })
+    Ok(ParsedPage {
+        title,
+        breadcrumbs,
+        body,
+        module,
+    })
 }
 
 fn pick_text(doc: &Html, selectors: &[&str]) -> Option<String> {
     for raw in selectors {
-        let Ok(sel) = Selector::parse(raw) else { continue };
+        let Ok(sel) = Selector::parse(raw) else {
+            continue;
+        };
         if let Some(el) = doc.select(&sel).next() {
             let text: String = el.text().collect::<Vec<_>>().join(" ");
             let trimmed = text.trim();
-            if !trimmed.is_empty() { return Some(trimmed.to_string()); }
+            if !trimmed.is_empty() {
+                return Some(trimmed.to_string());
+            }
         }
     }
     None
 }
 
 fn collect_text(doc: &Html, raw: &str) -> Vec<String> {
-    let Ok(sel) = Selector::parse(raw) else { return Vec::new() };
+    let Ok(sel) = Selector::parse(raw) else {
+        return Vec::new();
+    };
     doc.select(&sel)
         .map(|el| el.text().collect::<Vec<_>>().join(" "))
         .collect()
@@ -111,7 +125,11 @@ pub struct LearnCrawler {
 }
 
 impl LearnCrawler {
-    pub fn new() -> Self { Self { domain: Domain::Learn } }
+    pub fn new() -> Self {
+        Self {
+            domain: Domain::Learn,
+        }
+    }
 
     pub fn with_domain(mut self, domain: Domain) -> Self {
         self.domain = domain;
@@ -119,7 +137,10 @@ impl LearnCrawler {
     }
 
     /// Walk a local directory of `*.html` files (test / offline mode).
-    pub async fn crawl_directory(&self, root: impl AsRef<Path>) -> Result<Vec<Document>, CrawlError> {
+    pub async fn crawl_directory(
+        &self,
+        root: impl AsRef<Path>,
+    ) -> Result<Vec<Document>, CrawlError> {
         let mut docs = Vec::new();
         let mut stack: Vec<PathBuf> = vec![root.as_ref().to_path_buf()];
         while let Some(p) = stack.pop() {
@@ -143,7 +164,10 @@ impl LearnCrawler {
     async fn crawl_file(&self, path: &Path) -> Result<Document, CrawlError> {
         let raw = tokio::fs::read_to_string(path).await?;
         let page = parse_learn_html(&raw)?;
-        let rel = path.file_stem().and_then(|s| s.to_str()).unwrap_or("unknown");
+        let rel = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("unknown");
         let id = format!("{}:{}", self.domain.collection(), rel);
         let uri = format!("file://{}", path.display());
 
@@ -168,7 +192,10 @@ impl LearnCrawler {
         if let Some(etag) = previous_etag {
             req = req.header("If-None-Match", etag);
         }
-        let resp = req.send().await.map_err(|e| CrawlError::Http(e.to_string()))?;
+        let resp = req
+            .send()
+            .await
+            .map_err(|e| CrawlError::Http(e.to_string()))?;
         if resp.status().as_u16() == 304 {
             debug!(url, "304 Not Modified");
             return Ok(None);
@@ -176,8 +203,14 @@ impl LearnCrawler {
         if !resp.status().is_success() {
             return Err(CrawlError::Http(format!("{} -> {}", url, resp.status())));
         }
-        let etag = resp.headers().get(reqwest::header::ETAG).and_then(|v| v.to_str().ok().map(String::from));
-        let body = resp.text().await.map_err(|e| CrawlError::Http(e.to_string()))?;
+        let etag = resp
+            .headers()
+            .get(reqwest::header::ETAG)
+            .and_then(|v| v.to_str().ok().map(String::from));
+        let body = resp
+            .text()
+            .await
+            .map_err(|e| CrawlError::Http(e.to_string()))?;
         let page = parse_learn_html(&body)?;
         let id = derive_id_from_url(url, self.domain);
         let mut doc = Document::new(id, self.domain, url, page.title, page.body);
@@ -191,7 +224,9 @@ impl LearnCrawler {
 }
 
 impl Default for LearnCrawler {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 fn derive_id_from_url(url: &str, domain: Domain) -> String {
@@ -240,7 +275,10 @@ mod tests {
     fn parses_title_breadcrumb_body() {
         let p = parse_learn_html(SAMPLE).unwrap();
         assert_eq!(p.title, "Financial period close in Dynamics 365 Finance");
-        assert_eq!(p.breadcrumbs, vec!["Finance", "General Ledger", "Period Close"]);
+        assert_eq!(
+            p.breadcrumbs,
+            vec!["Finance", "General Ledger", "Period Close"]
+        );
         assert!(p.body.contains("FiscalCalendarPeriod"));
         assert!(p.body.contains("GeneralJournalAccountEntry"));
         assert_eq!(p.module.as_deref(), Some("GeneralLedger"));

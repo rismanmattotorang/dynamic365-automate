@@ -81,9 +81,13 @@ impl Skill {
         let mut out = self.body.clone();
         for arg in &self.arguments {
             let placeholder = format!("{{{{{}}}}}", arg.name);
-            let replacement = args.get(&arg.name)
-                .cloned()
-                .unwrap_or_else(|| if arg.required { format!("<MISSING {}>", arg.name) } else { String::new() });
+            let replacement = args.get(&arg.name).cloned().unwrap_or_else(|| {
+                if arg.required {
+                    format!("<MISSING {}>", arg.name)
+                } else {
+                    String::new()
+                }
+            });
             out = out.replace(&placeholder, &replacement);
         }
         out
@@ -97,28 +101,48 @@ pub struct SkillRegistry {
 }
 
 impl SkillRegistry {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
-    pub fn skills(&self) -> impl Iterator<Item = &Skill> { self.skills.values() }
+    pub fn skills(&self) -> impl Iterator<Item = &Skill> {
+        self.skills.values()
+    }
 
-    pub fn get(&self, name: &str) -> Option<&Skill> { self.skills.get(name) }
+    pub fn get(&self, name: &str) -> Option<&Skill> {
+        self.skills.get(name)
+    }
 
-    pub fn len(&self) -> usize { self.skills.len() }
-    pub fn is_empty(&self) -> bool { self.skills.is_empty() }
+    pub fn len(&self) -> usize {
+        self.skills.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.skills.is_empty()
+    }
 
-    pub fn insert(&mut self, skill: Skill) { self.skills.insert(skill.name.clone(), skill); }
+    pub fn insert(&mut self, skill: Skill) {
+        self.skills.insert(skill.name.clone(), skill);
+    }
 
     /// Walk a directory recursively and load every `*.md` file as a skill.
     /// Idempotent — re-scan to hot-reload.
     pub async fn scan_paths(&mut self, paths: &[PathBuf]) -> Result<usize, SkillError> {
         let mut loaded = 0;
         for root in paths {
-            if !root.exists() { continue; }
+            if !root.exists() {
+                continue;
+            }
             let mut stack = vec![root.clone()];
             while let Some(p) = stack.pop() {
-                let meta = match tokio::fs::metadata(&p).await { Ok(m) => m, Err(_) => continue };
+                let meta = match tokio::fs::metadata(&p).await {
+                    Ok(m) => m,
+                    Err(_) => continue,
+                };
                 if meta.is_dir() {
-                    let mut rd = match tokio::fs::read_dir(&p).await { Ok(r) => r, Err(_) => continue };
+                    let mut rd = match tokio::fs::read_dir(&p).await {
+                        Ok(r) => r,
+                        Err(_) => continue,
+                    };
                     while let Ok(Some(entry)) = rd.next_entry().await {
                         stack.push(entry.path());
                     }
@@ -142,13 +166,14 @@ impl SkillRegistry {
 /// followed by the body.
 pub async fn parse_skill_file(path: &Path) -> Result<Skill, SkillError> {
     let raw = tokio::fs::read_to_string(path).await?;
-    let (frontmatter, body) = split_frontmatter(&raw)
-        .ok_or_else(|| SkillError::Frontmatter {
-            path: path.display().to_string(),
-            reason: "missing --- frontmatter".into(),
-        })?;
-    let mut skill = parse_frontmatter(frontmatter)
-        .map_err(|e| SkillError::Frontmatter { path: path.display().to_string(), reason: e })?;
+    let (frontmatter, body) = split_frontmatter(&raw).ok_or_else(|| SkillError::Frontmatter {
+        path: path.display().to_string(),
+        reason: "missing --- frontmatter".into(),
+    })?;
+    let mut skill = parse_frontmatter(frontmatter).map_err(|e| SkillError::Frontmatter {
+        path: path.display().to_string(),
+        reason: e,
+    })?;
     skill.body = body.trim().to_string();
     skill.source = Some(path.display().to_string());
     Ok(skill)
@@ -182,7 +207,10 @@ fn parse_frontmatter(text: &str) -> Result<Skill, String> {
     while i < lines.len() {
         let line = lines[i];
         let trimmed = line.trim_end();
-        if trimmed.is_empty() || trimmed.starts_with('#') { i += 1; continue; }
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            i += 1;
+            continue;
+        }
 
         if let Some(rest) = trimmed.strip_prefix("name:") {
             name = rest.trim().trim_matches('"').to_string();
@@ -191,22 +219,34 @@ fn parse_frontmatter(text: &str) -> Result<Skill, String> {
         } else if trimmed.starts_with("tags:") {
             tags = parse_inline_list(trimmed.trim_start_matches("tags:").trim());
         } else if trimmed.starts_with("requires_tools:") {
-            requires_tools = parse_inline_list(trimmed.trim_start_matches("requires_tools:").trim());
+            requires_tools =
+                parse_inline_list(trimmed.trim_start_matches("requires_tools:").trim());
         } else if trimmed == "arguments:" {
             // Parse a list of mappings until we hit a non-indented line.
             i += 1;
             while i < lines.len() {
                 let next = lines[i];
-                if !next.starts_with(' ') && !next.starts_with('\t') && !next.is_empty() { break; }
+                if !next.starts_with(' ') && !next.starts_with('\t') && !next.is_empty() {
+                    break;
+                }
                 let next_t = next.trim();
-                if next_t.is_empty() { i += 1; continue; }
+                if next_t.is_empty() {
+                    i += 1;
+                    continue;
+                }
                 if let Some(after) = next_t.strip_prefix("- name:") {
                     let arg_name = after.trim().trim_matches('"').to_string();
-                    let mut arg = SkillArgument { name: arg_name, description: None, required: false };
+                    let mut arg = SkillArgument {
+                        name: arg_name,
+                        description: None,
+                        required: false,
+                    };
                     i += 1;
                     while i < lines.len() {
                         let inner = lines[i];
-                        if !inner.starts_with("    ") && !inner.starts_with("\t\t") { break; }
+                        if !inner.starts_with("    ") && !inner.starts_with("\t\t") {
+                            break;
+                        }
                         let inner_t = inner.trim();
                         if let Some(d) = inner_t.strip_prefix("description:") {
                             arg.description = Some(d.trim().trim_matches('"').to_string());
@@ -225,10 +265,22 @@ fn parse_frontmatter(text: &str) -> Result<Skill, String> {
         i += 1;
     }
 
-    if name.is_empty() { return Err("missing `name:` field".into()); }
-    if description.is_empty() { return Err("missing `description:` field".into()); }
+    if name.is_empty() {
+        return Err("missing `name:` field".into());
+    }
+    if description.is_empty() {
+        return Err("missing `description:` field".into());
+    }
 
-    Ok(Skill { name, description, tags, requires_tools, arguments, body: String::new(), source: None })
+    Ok(Skill {
+        name,
+        description,
+        tags,
+        requires_tools,
+        arguments,
+        body: String::new(),
+        source: None,
+    })
 }
 
 fn parse_inline_list(s: &str) -> Vec<String> {
@@ -278,7 +330,8 @@ Investigate period close for {{legal_entity}}.
         let tmp = tempfile::tempdir().unwrap();
         for (slug, body) in [("a", "A skill"), ("b", "B skill")] {
             let path = tmp.path().join(format!("{slug}.md"));
-            let content = format!("---\nname: d365.skill.{slug}\ndescription: {body}\n---\n\nBody {slug}.\n");
+            let content =
+                format!("---\nname: d365.skill.{slug}\ndescription: {body}\n---\n\nBody {slug}.\n");
             tokio::fs::write(&path, content).await.unwrap();
         }
         let mut reg = SkillRegistry::new();
@@ -290,11 +343,21 @@ Investigate period close for {{legal_entity}}.
     #[test]
     fn render_substitutes_arguments() {
         let s = Skill {
-            name: "x".into(), description: "y".into(),
-            tags: vec![], requires_tools: vec![],
+            name: "x".into(),
+            description: "y".into(),
+            tags: vec![],
+            requires_tools: vec![],
             arguments: vec![
-                SkillArgument { name: "legal_entity".into(), description: None, required: true },
-                SkillArgument { name: "optional".into(), description: None, required: false },
+                SkillArgument {
+                    name: "legal_entity".into(),
+                    description: None,
+                    required: true,
+                },
+                SkillArgument {
+                    name: "optional".into(),
+                    description: None,
+                    required: false,
+                },
             ],
             body: "Code: {{legal_entity}}, Opt: {{optional}}".into(),
             source: None,
@@ -308,11 +371,15 @@ Investigate period close for {{legal_entity}}.
     #[test]
     fn render_flags_missing_required() {
         let s = Skill {
-            name: "x".into(), description: "y".into(),
-            tags: vec![], requires_tools: vec![],
-            arguments: vec![
-                SkillArgument { name: "legal_entity".into(), description: None, required: true },
-            ],
+            name: "x".into(),
+            description: "y".into(),
+            tags: vec![],
+            requires_tools: vec![],
+            arguments: vec![SkillArgument {
+                name: "legal_entity".into(),
+                description: None,
+                required: true,
+            }],
             body: "Code: {{legal_entity}}".into(),
             source: None,
         };

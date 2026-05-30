@@ -150,7 +150,11 @@ pub struct Tool {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ListToolsResult {
     pub tools: Vec<Tool>,
-    #[serde(default, rename = "nextCursor", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        rename = "nextCursor",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub next_cursor: Option<String>,
 }
 
@@ -164,13 +168,23 @@ pub struct CallToolParams {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ToolContent {
-    Text { text: String },
-    Image { data: String, #[serde(rename = "mimeType")] mime_type: String },
-    Resource { resource: ResourceContents },
+    Text {
+        text: String,
+    },
+    Image {
+        data: String,
+        #[serde(rename = "mimeType")]
+        mime_type: String,
+    },
+    Resource {
+        resource: ResourceContents,
+    },
 }
 
 impl ToolContent {
-    pub fn text(s: impl Into<String>) -> Self { Self::Text { text: s.into() } }
+    pub fn text(s: impl Into<String>) -> Self {
+        Self::Text { text: s.into() }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -182,10 +196,16 @@ pub struct CallToolResult {
 
 impl CallToolResult {
     pub fn text(s: impl Into<String>) -> Self {
-        Self { content: vec![ToolContent::text(s)], is_error: false }
+        Self {
+            content: vec![ToolContent::text(s)],
+            is_error: false,
+        }
     }
     pub fn error(s: impl Into<String>) -> Self {
-        Self { content: vec![ToolContent::text(s)], is_error: true }
+        Self {
+            content: vec![ToolContent::text(s)],
+            is_error: true,
+        }
     }
 }
 
@@ -206,7 +226,11 @@ pub struct Resource {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ListResourcesResult {
     pub resources: Vec<Resource>,
-    #[serde(default, rename = "nextCursor", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        rename = "nextCursor",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub next_cursor: Option<String>,
 }
 
@@ -267,7 +291,11 @@ pub struct Prompt {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ListPromptsResult {
     pub prompts: Vec<Prompt>,
-    #[serde(default, rename = "nextCursor", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        rename = "nextCursor",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub next_cursor: Option<String>,
 }
 
@@ -367,8 +395,12 @@ pub enum ProgressToken {
 }
 
 impl ProgressToken {
-    pub fn from_string(s: impl Into<String>) -> Self { Self::String(s.into()) }
-    pub fn from_number(n: i64) -> Self { Self::Number(n) }
+    pub fn from_string(s: impl Into<String>) -> Self {
+        Self::String(s.into())
+    }
+    pub fn from_number(n: i64) -> Self {
+        Self::Number(n)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

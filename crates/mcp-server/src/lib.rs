@@ -13,12 +13,11 @@ pub mod registry;
 mod server;
 
 pub use elicit::{
-    elicit, current_context, object_schema, ElicitationHandle, ToolContext, TOOL_CONTEXT,
+    current_context, elicit, object_schema, ElicitationHandle, ToolContext, TOOL_CONTEXT,
 };
 pub use registry::{
-    ToolHandler, ToolFn, ResourceHandler, PromptHandler,
-    ToolDescriptor, ResourceDescriptor, PromptDescriptor,
-    ToolExposure, ExposurePolicy,
+    ExposurePolicy, PromptDescriptor, PromptHandler, ResourceDescriptor, ResourceHandler,
+    ToolDescriptor, ToolExposure, ToolFn, ToolHandler,
 };
 pub use server::{Server, ServerBuilder, ServerContext};
 

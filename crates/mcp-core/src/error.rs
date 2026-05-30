@@ -64,6 +64,9 @@ pub enum Error {
 
 impl Error {
     pub fn protocol(code: ErrorCode, message: impl Into<String>) -> Self {
-        Self::Protocol { code: code.as_i32(), message: message.into() }
+        Self::Protocol {
+            code: code.as_i32(),
+            message: message.into(),
+        }
     }
 }

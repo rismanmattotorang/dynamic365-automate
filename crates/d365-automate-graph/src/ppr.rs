@@ -31,7 +31,12 @@ pub struct PprConfig {
 
 impl Default for PprConfig {
     fn default() -> Self {
-        Self { alpha: 0.15, max_iterations: 50, tolerance: 1e-5, max_hops: 4 }
+        Self {
+            alpha: 0.15,
+            max_iterations: 50,
+            tolerance: 1e-5,
+            max_hops: 4,
+        }
     }
 }
 
@@ -51,13 +56,13 @@ pub struct PprHit {
 }
 
 /// Run PPR from the supplied seeds.
-pub fn personalised_pagerank(
-    g: &InMemoryGraph,
-    seeds: &[NodeId],
-    cfg: &PprConfig,
-) -> PprResult {
+pub fn personalised_pagerank(g: &InMemoryGraph, seeds: &[NodeId], cfg: &PprConfig) -> PprResult {
     if seeds.is_empty() {
-        return PprResult { seeds: Vec::new(), ranked: Vec::new(), iterations: 0 };
+        return PprResult {
+            seeds: Vec::new(),
+            ranked: Vec::new(),
+            iterations: 0,
+        };
     }
 
     // Build a stable node ordering.
@@ -81,14 +86,18 @@ pub fn personalised_pagerank(
     // Personalisation vector: equal probability mass split across seeds
     // that exist in the graph.
     let mut p: Vec<f32> = vec![0.0; n];
-    let seed_indices: Vec<usize> = seeds.iter()
-        .filter_map(|s| idx.get(s).copied())
-        .collect();
+    let seed_indices: Vec<usize> = seeds.iter().filter_map(|s| idx.get(s).copied()).collect();
     if seed_indices.is_empty() {
-        return PprResult { seeds: seeds.to_vec(), ranked: Vec::new(), iterations: 0 };
+        return PprResult {
+            seeds: seeds.to_vec(),
+            ranked: Vec::new(),
+            iterations: 0,
+        };
     }
     let seed_share = 1.0 / seed_indices.len() as f32;
-    for &i in &seed_indices { p[i] = seed_share; }
+    for &i in &seed_indices {
+        p[i] = seed_share;
+    }
 
     let teleport = p.clone();
     let alpha = cfg.alpha;
@@ -99,7 +108,9 @@ pub fn personalised_pagerank(
         let mut next = vec![0.0f32; n];
         // Distribute mass along edges.
         for i in 0..n {
-            if out_weight[i] <= 0.0 || p[i] == 0.0 { continue; }
+            if out_weight[i] <= 0.0 || p[i] == 0.0 {
+                continue;
+            }
             let outgoing = (1.0 - alpha) * p[i];
             for &(j, w) in &neighbours[i] {
                 next[j] += outgoing * (w / out_weight[i]);
@@ -112,33 +123,50 @@ pub fn personalised_pagerank(
             // back to the teleport vector to preserve total mass.
             if out_weight[i] <= 0.0 && p[i] > 0.0 {
                 let dangling = (1.0 - alpha) * p[i];
-                for j in 0..n { next[j] += dangling * teleport[j]; }
+                for j in 0..n {
+                    next[j] += dangling * teleport[j];
+                }
             }
         }
         // L1 distance — convergence check.
         let delta: f32 = p.iter().zip(next.iter()).map(|(a, b)| (a - b).abs()).sum();
         p = next;
-        if delta < cfg.tolerance { break; }
+        if delta < cfg.tolerance {
+            break;
+        }
     }
 
     // BFS for hop-distance per node from any seed.
     let hops = bfs_hops(&neighbours, &seed_indices, cfg.max_hops);
 
     // Rank by score, exclude any score effectively zero.
-    let mut ranked: Vec<PprHit> = (0..n).map(|i| PprHit {
-        id: node_ids[i].clone(),
-        score: p[i],
-        hops: hops[i],
-    }).collect();
-    ranked.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
-    PprResult { seeds: seeds.to_vec(), ranked, iterations }
+    let mut ranked: Vec<PprHit> = (0..n)
+        .map(|i| PprHit {
+            id: node_ids[i].clone(),
+            score: p[i],
+            hops: hops[i],
+        })
+        .collect();
+    ranked.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    PprResult {
+        seeds: seeds.to_vec(),
+        ranked,
+        iterations,
+    }
 }
 
 fn bfs_hops(neighbours: &[Vec<(usize, f32)>], seeds: &[usize], max_hops: u32) -> Vec<u32> {
     let n = neighbours.len();
     let mut hops = vec![u32::MAX; n];
     let mut frontier: Vec<usize> = Vec::new();
-    for &s in seeds { hops[s] = 0; frontier.push(s); }
+    for &s in seeds {
+        hops[s] = 0;
+        frontier.push(s);
+    }
     let mut depth = 0u32;
     while !frontier.is_empty() && depth < max_hops {
         let mut next_frontier = Vec::new();
@@ -184,7 +212,9 @@ mod tests {
         let r = multi_hop_search(&g, "period close GeneralJournalAccountEntry", 3, &cfg, 8);
         let ids: Vec<&str> = r.ranked.iter().map(|h| h.id.as_str()).collect();
         // PPR should surface the period_close concept and the account-entry entity.
-        assert!(ids.iter().any(|id| *id == "concept:period_close" || *id == "ent:GeneralJournalAccountEntry"));
+        assert!(ids
+            .iter()
+            .any(|id| *id == "concept:period_close" || *id == "ent:GeneralJournalAccountEntry"));
         // It should also reach the FIN-CORE solution via GeneralJournalAccountEntry.
         assert!(ids.contains(&"sol:FIN-CORE"),
             "PPR should cross from period_close → GeneralJournalAccountEntry → FIN-CORE; got {ids:?}");
@@ -193,10 +223,18 @@ mod tests {
     #[test]
     fn ppr_respects_max_hops() {
         let g = InMemoryGraph::with_demo_corpus();
-        let cfg = PprConfig { max_hops: 1, ..PprConfig::default() };
+        let cfg = PprConfig {
+            max_hops: 1,
+            ..PprConfig::default()
+        };
         let r = multi_hop_search(&g, "GTFinPostable", 1, &cfg, 50);
         for h in &r.ranked {
-            assert!(h.hops <= 1, "hop budget violated: {} at {} hops", h.id, h.hops);
+            assert!(
+                h.hops <= 1,
+                "hop budget violated: {} at {} hops",
+                h.id,
+                h.hops
+            );
         }
     }
 }

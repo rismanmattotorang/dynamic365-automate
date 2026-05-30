@@ -90,9 +90,10 @@ pub trait KnowledgeStore: Send + Sync {
     /// rankings so the caller can fuse with RRF.  Default impl falls back
     /// to a single search() call; backends that have both indexes should
     /// override.
-    async fn hybrid_search(&self, query: SearchQuery)
-        -> Result<(Vec<SearchHit>, Vec<SearchHit>), StoreError>
-    {
+    async fn hybrid_search(
+        &self,
+        query: SearchQuery,
+    ) -> Result<(Vec<SearchHit>, Vec<SearchHit>), StoreError> {
         let dense = self.search(query.clone()).await?;
         Ok((dense, Vec::new()))
     }
@@ -146,7 +147,9 @@ pub struct InMemoryKb {
 }
 
 impl InMemoryKb {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     /// Synchronous, infallible upsert for sync seed code (no .await needed).
     pub fn insert_document(&self, doc: Document) {
@@ -193,9 +196,10 @@ impl KnowledgeStore for InMemoryKb {
         }
     }
 
-    async fn hybrid_search(&self, query: SearchQuery)
-        -> Result<(Vec<SearchHit>, Vec<SearchHit>), StoreError>
-    {
+    async fn hybrid_search(
+        &self,
+        query: SearchQuery,
+    ) -> Result<(Vec<SearchHit>, Vec<SearchHit>), StoreError> {
         // Dense and sparse rankings run in parallel and are returned separately
         // for RRF fusion in the caller (paper §VII-C).
         let dense = if let Some(qe) = &query.embedding {
@@ -217,18 +221,32 @@ impl KnowledgeStore for InMemoryKb {
 }
 
 impl InMemoryKb {
-    async fn dense_search(&self, qe: &[f32], query: &SearchQuery) -> Result<Vec<SearchHit>, StoreError> {
+    async fn dense_search(
+        &self,
+        qe: &[f32],
+        query: &SearchQuery,
+    ) -> Result<Vec<SearchHit>, StoreError> {
         let chunks = self.chunks.read().unwrap();
         let want_domain = |d: Domain| query.domains.is_empty() || query.domains.contains(&d);
-        let mut hits: Vec<SearchHit> = chunks.values()
+        let mut hits: Vec<SearchHit> = chunks
+            .values()
             .filter(|c| want_domain(c.domain))
             .filter_map(|c| {
                 let ce = c.embedding.as_ref()?;
-                if ce.len() != qe.len() { return None; }
-                Some(SearchHit { chunk: c.clone(), score: cosine(ce, qe) })
+                if ce.len() != qe.len() {
+                    return None;
+                }
+                Some(SearchHit {
+                    chunk: c.clone(),
+                    score: cosine(ce, qe),
+                })
             })
             .collect();
-        hits.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        hits.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         hits.truncate(query.top_k);
         Ok(hits)
     }
@@ -247,10 +265,14 @@ impl InMemoryKb {
         // Filter corpus to the targeted domains so IDF stays relevant.
         let candidates: Vec<&Chunk> = chunks.values().filter(|c| want_domain(c.domain)).collect();
         let n = candidates.len();
-        if n == 0 { return Ok(Vec::new()); }
+        if n == 0 {
+            return Ok(Vec::new());
+        }
 
         let query_terms: Vec<String> = tokenize(&query.text);
-        if query_terms.is_empty() { return Ok(Vec::new()); }
+        if query_terms.is_empty() {
+            return Ok(Vec::new());
+        }
 
         // Average document length across the candidate set.
         let mut doc_term_counts: Vec<HashMap<String, u32>> = Vec::with_capacity(n);
@@ -266,13 +288,21 @@ impl InMemoryKb {
             doc_lens.push(len);
         }
         let avg_dl: f32 = doc_lens.iter().sum::<u32>() as f32 / n as f32;
-        if avg_dl == 0.0 { return Ok(Vec::new()); }
+        if avg_dl == 0.0 {
+            return Ok(Vec::new());
+        }
 
         // Document frequency per query term.
-        let df: HashMap<&String, usize> = query_terms.iter().map(|term| {
-            let count = doc_term_counts.iter().filter(|c| c.contains_key(term)).count();
-            (term, count)
-        }).collect();
+        let df: HashMap<&String, usize> = query_terms
+            .iter()
+            .map(|term| {
+                let count = doc_term_counts
+                    .iter()
+                    .filter(|c| c.contains_key(term))
+                    .count();
+                (term, count)
+            })
+            .collect();
 
         let mut hits: Vec<SearchHit> = Vec::with_capacity(n);
         for (idx, chunk) in candidates.iter().enumerate() {
@@ -281,17 +311,26 @@ impl InMemoryKb {
             let mut score = 0.0f32;
             for term in &query_terms {
                 let f = *counts.get(term).unwrap_or(&0) as f32;
-                if f == 0.0 { continue; }
+                if f == 0.0 {
+                    continue;
+                }
                 let df_t = *df.get(term).unwrap_or(&0) as f32;
                 let idf = ((n as f32 - df_t + 0.5) / (df_t + 0.5) + 1.0).ln();
                 let denom = f + K1 * (1.0 - B + B * dl / avg_dl);
                 score += idf * (f * (K1 + 1.0)) / denom;
             }
             if score > 0.0 {
-                hits.push(SearchHit { chunk: (*chunk).clone(), score });
+                hits.push(SearchHit {
+                    chunk: (*chunk).clone(),
+                    score,
+                });
             }
         }
-        hits.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        hits.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         hits.truncate(query.top_k);
         Ok(hits)
     }
@@ -307,11 +346,16 @@ fn tokenize(text: &str) -> Vec<String> {
         if ch.is_alphanumeric() || ch == '_' {
             current.push(ch.to_ascii_lowercase());
         } else if !current.is_empty() {
-            if current.len() >= 2 { out.push(std::mem::take(&mut current)); }
-            else { current.clear(); }
+            if current.len() >= 2 {
+                out.push(std::mem::take(&mut current));
+            } else {
+                current.clear();
+            }
         }
     }
-    if current.len() >= 2 { out.push(current); }
+    if current.len() >= 2 {
+        out.push(current);
+    }
     out
 }
 
@@ -353,7 +397,8 @@ mod tests {
         kb.insert_chunk(sample_chunk("a", Domain::Learn, "period close in FI", None));
         kb.insert_chunk(sample_chunk("b", Domain::Xpp, "period close routine", None));
 
-        let hits = kb.search(SearchQuery::text("period close", 10).with_domain(Domain::Learn))
+        let hits = kb
+            .search(SearchQuery::text("period close", 10).with_domain(Domain::Learn))
             .await
             .unwrap();
         assert_eq!(hits.len(), 1);
@@ -363,8 +408,18 @@ mod tests {
     #[tokio::test]
     async fn vector_search_orders_by_cosine() {
         let kb = InMemoryKb::new();
-        kb.insert_chunk(sample_chunk("near", Domain::Learn, "x", Some(vec![1.0, 0.0, 0.0])));
-        kb.insert_chunk(sample_chunk("far",  Domain::Learn, "y", Some(vec![0.0, 1.0, 0.0])));
+        kb.insert_chunk(sample_chunk(
+            "near",
+            Domain::Learn,
+            "x",
+            Some(vec![1.0, 0.0, 0.0]),
+        ));
+        kb.insert_chunk(sample_chunk(
+            "far",
+            Domain::Learn,
+            "y",
+            Some(vec![0.0, 1.0, 0.0]),
+        ));
 
         let q = SearchQuery::text("", 10).with_embedding(vec![1.0, 0.0, 0.0]);
         let hits = kb.search(q).await.unwrap();
@@ -409,7 +464,10 @@ mod tests {
     async fn get_document_tree_uses_default_builder() {
         let kb = InMemoryKb::new();
         let doc = Document::new(
-            "learn:demo", Domain::Learn, "u", "Demo",
+            "learn:demo",
+            Domain::Learn,
+            "u",
+            "Demo",
             "# Top\nbody\n## Sub\nmore\n",
         );
         kb.insert_document(doc.clone());

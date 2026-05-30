@@ -75,7 +75,8 @@ impl RobotsTxt {
                             "crawl-delay" => {
                                 if let Ok(secs) = value.parse::<f64>() {
                                     if secs.is_finite() && secs >= 0.0 {
-                                        g.crawl_delay = Some(Duration::from_millis((secs * 1000.0) as u64));
+                                        g.crawl_delay =
+                                            Some(Duration::from_millis((secs * 1000.0) as u64));
                                     }
                                 }
                             }
@@ -124,9 +125,7 @@ impl RobotsTxt {
             if agent == "*" {
                 continue;
             }
-            if ua.starts_with(agent)
-                && best.map(|(len, _)| agent.len() > len).unwrap_or(true)
-            {
+            if ua.starts_with(agent) && best.map(|(len, _)| agent.len() > len).unwrap_or(true) {
                 best = Some((agent.len(), g));
             }
         }
@@ -146,7 +145,8 @@ fn strip_comment(line: &str) -> &str {
 
 fn longest_prefix_match(rules: Option<&Vec<String>>, path: &str) -> Option<usize> {
     let rules = rules?;
-    rules.iter()
+    rules
+        .iter()
         .filter(|r| path.starts_with(r.as_str()))
         .map(|r| r.len())
         .max()
@@ -171,13 +171,19 @@ Crawl-delay: 0.5
     #[test]
     fn wildcard_disallow_blocks_private() {
         let r = RobotsTxt::parse(SAMPLE);
-        assert_eq!(r.is_allowed("OtherBot", "/private/foo"), Decision::Disallowed);
+        assert_eq!(
+            r.is_allowed("OtherBot", "/private/foo"),
+            Decision::Disallowed
+        );
     }
 
     #[test]
     fn longest_prefix_allow_wins_over_disallow() {
         let r = RobotsTxt::parse(SAMPLE);
-        assert_eq!(r.is_allowed("OtherBot", "/private/public/index.html"), Decision::Allowed);
+        assert_eq!(
+            r.is_allowed("OtherBot", "/private/public/index.html"),
+            Decision::Allowed
+        );
     }
 
     #[test]
@@ -186,15 +192,24 @@ Crawl-delay: 0.5
         // d365-automate's group disallows /admin/, doesn't disallow /private/.
         // RFC 9309: once the more-specific group is selected, the * group
         // is ignored entirely.
-        assert_eq!(r.is_allowed("d365-automate", "/private/foo"), Decision::Allowed);
-        assert_eq!(r.is_allowed("d365-automate", "/admin/x"), Decision::Disallowed);
+        assert_eq!(
+            r.is_allowed("d365-automate", "/private/foo"),
+            Decision::Allowed
+        );
+        assert_eq!(
+            r.is_allowed("d365-automate", "/admin/x"),
+            Decision::Disallowed
+        );
     }
 
     #[test]
     fn crawl_delay_is_parsed_per_agent() {
         let r = RobotsTxt::parse(SAMPLE);
         assert_eq!(r.crawl_delay("OtherBot"), Some(Duration::from_secs(2)));
-        assert_eq!(r.crawl_delay("d365-automate"), Some(Duration::from_millis(500)));
+        assert_eq!(
+            r.crawl_delay("d365-automate"),
+            Some(Duration::from_millis(500))
+        );
     }
 
     #[test]

@@ -32,14 +32,22 @@ impl ToolStat {
 
     pub fn record(&mut self, latency_us: u64, error: bool, breakdown: Option<LatencyBreakdown>) {
         self.invocations += 1;
-        if error { self.errors += 1; }
-        if self.samples_us.len() == 120 { self.samples_us.pop_front(); }
+        if error {
+            self.errors += 1;
+        }
+        if self.samples_us.len() == 120 {
+            self.samples_us.pop_front();
+        }
         self.samples_us.push_back(latency_us);
-        if breakdown.is_some() { self.last_breakdown = breakdown; }
+        if breakdown.is_some() {
+            self.last_breakdown = breakdown;
+        }
     }
 
     pub fn percentile(&self, q: f64) -> u64 {
-        if self.samples_us.is_empty() { return 0; }
+        if self.samples_us.is_empty() {
+            return 0;
+        }
         let mut v: Vec<u64> = self.samples_us.iter().copied().collect();
         v.sort_unstable();
         v[((v.len() as f64 * q) as usize).min(v.len() - 1)]
@@ -65,19 +73,47 @@ pub struct LogEntry {
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 #[allow(dead_code)] // Error variant used by future admin-endpoint feed; kept for API stability.
-pub enum LogLevel { Info, Warn, Error }
+pub enum LogLevel {
+    Info,
+    Warn,
+    Error,
+}
 
 #[derive(Clone)]
 pub enum TrafficEvent {
-    ToolCall { name: String, latency_us: u64, error: bool, breakdown: Option<LatencyBreakdown> },
-    SessionOpen { id: String, client: String, protocol: String },
-    SessionClose { id: String },
-    Log { level: LogLevel, source: String, message: String },
-    KbStat { collection: String, points: u64, staleness_pct: f64 },
+    ToolCall {
+        name: String,
+        latency_us: u64,
+        error: bool,
+        breakdown: Option<LatencyBreakdown>,
+    },
+    SessionOpen {
+        id: String,
+        client: String,
+        protocol: String,
+    },
+    SessionClose {
+        id: String,
+    },
+    Log {
+        level: LogLevel,
+        source: String,
+        message: String,
+    },
+    KbStat {
+        collection: String,
+        points: u64,
+        staleness_pct: f64,
+    },
     /// Service metadata cache snapshot (TTL pattern, polled from the
     /// `d365-cache://stats` resource on the live admin feed; synthesised by
     /// the offline traffic generator).
-    CacheStat { hits: u64, misses: u64, entries: usize, hit_ratio: f64 },
+    CacheStat {
+        hits: u64,
+        misses: u64,
+        entries: usize,
+        hit_ratio: f64,
+    },
 }
 
 #[derive(Clone, Copy, Default)]
@@ -113,9 +149,17 @@ impl App {
         }
     }
 
-    pub fn set_tab(&mut self, n: usize) { if n < 5 { self.current_tab = n; } }
-    pub fn next_tab(&mut self) { self.current_tab = (self.current_tab + 1) % 5; }
-    pub fn prev_tab(&mut self) { self.current_tab = (self.current_tab + 4) % 5; }
+    pub fn set_tab(&mut self, n: usize) {
+        if n < 5 {
+            self.current_tab = n;
+        }
+    }
+    pub fn next_tab(&mut self) {
+        self.current_tab = (self.current_tab + 1) % 5;
+    }
+    pub fn prev_tab(&mut self) {
+        self.current_tab = (self.current_tab + 4) % 5;
+    }
     pub fn scroll_down(&mut self) {
         let v = self.scroll.entry(self.current_tab).or_insert(0);
         *v = v.saturating_add(1);
@@ -127,31 +171,77 @@ impl App {
 
     pub fn observe(&mut self, ev: TrafficEvent) {
         match ev {
-            TrafficEvent::ToolCall { name, latency_us, error, breakdown } => {
-                let stat = self.tools.entry(name.clone()).or_insert_with(|| ToolStat::new(&name));
+            TrafficEvent::ToolCall {
+                name,
+                latency_us,
+                error,
+                breakdown,
+            } => {
+                let stat = self
+                    .tools
+                    .entry(name.clone())
+                    .or_insert_with(|| ToolStat::new(&name));
                 stat.record(latency_us, error, breakdown);
             }
-            TrafficEvent::SessionOpen { id, client, protocol } => {
-                self.sessions.insert(id.clone(), SessionRow {
-                    id, client, protocol, tools_called: 0,
-                    last_activity: Instant::now(),
-                });
+            TrafficEvent::SessionOpen {
+                id,
+                client,
+                protocol,
+            } => {
+                self.sessions.insert(
+                    id.clone(),
+                    SessionRow {
+                        id,
+                        client,
+                        protocol,
+                        tools_called: 0,
+                        last_activity: Instant::now(),
+                    },
+                );
             }
             TrafficEvent::SessionClose { id } => {
                 self.sessions.remove(&id);
             }
-            TrafficEvent::Log { level, source, message } => {
-                if self.logs.len() == 200 { self.logs.pop_front(); }
-                self.logs.push_back(LogEntry { at: Instant::now(), level, source, message });
+            TrafficEvent::Log {
+                level,
+                source,
+                message,
+            } => {
+                if self.logs.len() == 200 {
+                    self.logs.pop_front();
+                }
+                self.logs.push_back(LogEntry {
+                    at: Instant::now(),
+                    level,
+                    source,
+                    message,
+                });
             }
-            TrafficEvent::KbStat { collection, points, staleness_pct } => {
-                self.kb_collections.insert(collection, (points, staleness_pct));
+            TrafficEvent::KbStat {
+                collection,
+                points,
+                staleness_pct,
+            } => {
+                self.kb_collections
+                    .insert(collection, (points, staleness_pct));
             }
-            TrafficEvent::CacheStat { hits, misses, entries, hit_ratio } => {
-                self.cache = CacheSnapshot { hits, misses, entries, hit_ratio };
+            TrafficEvent::CacheStat {
+                hits,
+                misses,
+                entries,
+                hit_ratio,
+            } => {
+                self.cache = CacheSnapshot {
+                    hits,
+                    misses,
+                    entries,
+                    hit_ratio,
+                };
             }
         }
     }
 
-    pub fn uptime(&self) -> Duration { self.started_at.elapsed() }
+    pub fn uptime(&self) -> Duration {
+        self.started_at.elapsed()
+    }
 }

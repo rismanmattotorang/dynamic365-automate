@@ -13,8 +13,8 @@ use async_trait::async_trait;
 use tokio::sync::RwLock;
 
 use crate::client::{
-    BulkMetadata, D365Client, EntityStructure, EnvironmentInfo, PoolStatus, ReadEntityRequest,
-    EntityRow, ServiceCallRequest, ServiceOperationMeta, ServiceSearchResult,
+    BulkMetadata, D365Client, EntityRow, EntityStructure, EnvironmentInfo, PoolStatus,
+    ReadEntityRequest, ServiceCallRequest, ServiceOperationMeta, ServiceSearchResult,
 };
 use crate::error::D365Result;
 
@@ -30,7 +30,11 @@ pub struct CacheStats {
 impl CacheStats {
     pub fn hit_ratio(&self) -> f64 {
         let total = self.hits + self.misses;
-        if total == 0 { 0.0 } else { self.hits as f64 / total as f64 }
+        if total == 0 {
+            0.0
+        } else {
+            self.hits as f64 / total as f64
+        }
     }
 }
 
@@ -86,9 +90,17 @@ impl<C: D365Client + ?Sized> MetadataCache<C> {
     }
 
     async fn store(&self, key: (String, String), meta: ServiceOperationMeta) {
-        if self.ttl.is_zero() { return; }
+        if self.ttl.is_zero() {
+            return;
+        }
         let mut entries = self.entries.write().await;
-        entries.insert(key, Entry { meta, cached_at: Instant::now() });
+        entries.insert(
+            key,
+            Entry {
+                meta,
+                cached_at: Instant::now(),
+            },
+        );
     }
 }
 
@@ -102,7 +114,11 @@ impl<C: D365Client + ?Sized> D365Client for MetadataCache<C> {
         self.inner.search_service(query, limit).await
     }
 
-    async fn service_metadata(&self, operation: &str, language: &str) -> D365Result<ServiceOperationMeta> {
+    async fn service_metadata(
+        &self,
+        operation: &str,
+        language: &str,
+    ) -> D365Result<ServiceOperationMeta> {
         let key = (operation.to_string(), language.to_string());
         if let Some(meta) = self.get_fresh(&key).await {
             self.stats.write().await.hits += 1;
@@ -114,7 +130,11 @@ impl<C: D365Client + ?Sized> D365Client for MetadataCache<C> {
         Ok(meta)
     }
 
-    async fn bulk_service_metadata(&self, operations: &[String], language: &str) -> D365Result<BulkMetadata> {
+    async fn bulk_service_metadata(
+        &self,
+        operations: &[String],
+        language: &str,
+    ) -> D365Result<BulkMetadata> {
         // Serve as many as are cached; fall through for the rest in one bulk call.
         let mut cached = Vec::new();
         let mut to_fetch = Vec::new();
@@ -130,17 +150,29 @@ impl<C: D365Client + ?Sized> D365Client for MetadataCache<C> {
         }
         let mut missing = Vec::new();
         if !to_fetch.is_empty() {
-            let fetched = self.inner.bulk_service_metadata(&to_fetch, language).await?;
+            let fetched = self
+                .inner
+                .bulk_service_metadata(&to_fetch, language)
+                .await?;
             for meta in &fetched.operations {
-                self.store((meta.operation.clone(), language.to_string()), meta.clone()).await;
+                self.store((meta.operation.clone(), language.to_string()), meta.clone())
+                    .await;
             }
             cached.extend(fetched.operations);
             missing = fetched.missing;
         }
-        Ok(BulkMetadata { language: language.to_string(), operations: cached, missing })
+        Ok(BulkMetadata {
+            language: language.to_string(),
+            operations: cached,
+            missing,
+        })
     }
 
-    async fn call_service(&self, request: ServiceCallRequest, read_only_mode: bool) -> D365Result<serde_json::Value> {
+    async fn call_service(
+        &self,
+        request: ServiceCallRequest,
+        read_only_mode: bool,
+    ) -> D365Result<serde_json::Value> {
         self.inner.call_service(request, read_only_mode).await
     }
 
@@ -167,8 +199,14 @@ mod tests {
     async fn second_lookup_is_a_cache_hit() {
         let inner = MockD365Client::new(2, json!({ "legal_entity": "USMF" }));
         let cache = MetadataCache::new(inner, Duration::from_secs(60));
-        let _ = cache.service_metadata("LedgerGeneralJournalEntryPost", "en-us").await.unwrap();
-        let _ = cache.service_metadata("LedgerGeneralJournalEntryPost", "en-us").await.unwrap();
+        let _ = cache
+            .service_metadata("LedgerGeneralJournalEntryPost", "en-us")
+            .await
+            .unwrap();
+        let _ = cache
+            .service_metadata("LedgerGeneralJournalEntryPost", "en-us")
+            .await
+            .unwrap();
         let s = cache.stats().await;
         assert_eq!(s.hits, 1);
         assert_eq!(s.misses, 1);
@@ -179,7 +217,10 @@ mod tests {
     async fn invalidate_clears_entries() {
         let inner = MockD365Client::new(2, json!({ "legal_entity": "USMF" }));
         let cache = MetadataCache::new(inner, Duration::from_secs(60));
-        let _ = cache.service_metadata("EnvironmentInfo", "en-us").await.unwrap();
+        let _ = cache
+            .service_metadata("EnvironmentInfo", "en-us")
+            .await
+            .unwrap();
         cache.invalidate_all().await;
         assert_eq!(cache.stats().await.entries, 0);
     }

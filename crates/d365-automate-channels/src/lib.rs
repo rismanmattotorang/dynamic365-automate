@@ -91,7 +91,11 @@ pub struct OutgoingMessage {
 
 impl OutgoingMessage {
     pub fn text(address: impl Into<String>, text: impl Into<String>) -> Self {
-        Self { address: address.into(), text: text.into(), rich: None }
+        Self {
+            address: address.into(),
+            text: text.into(),
+            rich: None,
+        }
     }
 }
 
@@ -115,7 +119,11 @@ pub struct CliChannel {
 }
 
 impl CliChannel {
-    pub fn new() -> Arc<Self> { Arc::new(Self { sent: RwLock::new(Vec::new()) }) }
+    pub fn new() -> Arc<Self> {
+        Arc::new(Self {
+            sent: RwLock::new(Vec::new()),
+        })
+    }
     pub async fn log(&self) -> Vec<OutgoingMessage> {
         self.sent.read().await.clone()
     }
@@ -125,12 +133,18 @@ impl CliChannel {
 }
 
 impl Default for CliChannel {
-    fn default() -> Self { Self { sent: RwLock::new(Vec::new()) } }
+    fn default() -> Self {
+        Self {
+            sent: RwLock::new(Vec::new()),
+        }
+    }
 }
 
 #[async_trait]
 impl ChannelAdapter for CliChannel {
-    fn kind(&self) -> ChannelKind { ChannelKind::Cli }
+    fn kind(&self) -> ChannelKind {
+        ChannelKind::Cli
+    }
     async fn send(&self, msg: OutgoingMessage) -> Result<(), ChannelError> {
         self.sent.write().await.push(msg);
         Ok(())
@@ -152,7 +166,9 @@ pub struct TeamsAdapter {
 
 #[async_trait]
 impl ChannelAdapter for TeamsAdapter {
-    fn kind(&self) -> ChannelKind { ChannelKind::Teams }
+    fn kind(&self) -> ChannelKind {
+        ChannelKind::Teams
+    }
     async fn send(&self, _msg: OutgoingMessage) -> Result<(), ChannelError> {
         Err(ChannelError::NotConnected) // SDK wiring is Phase 8 finalisation
     }
@@ -165,17 +181,23 @@ pub struct SlackAdapter {
 
 #[async_trait]
 impl ChannelAdapter for SlackAdapter {
-    fn kind(&self) -> ChannelKind { ChannelKind::Slack }
+    fn kind(&self) -> ChannelKind {
+        ChannelKind::Slack
+    }
     async fn send(&self, _msg: OutgoingMessage) -> Result<(), ChannelError> {
         Err(ChannelError::NotConnected)
     }
 }
 
-pub struct TelegramAdapter { pub bot_token_env: String }
+pub struct TelegramAdapter {
+    pub bot_token_env: String,
+}
 
 #[async_trait]
 impl ChannelAdapter for TelegramAdapter {
-    fn kind(&self) -> ChannelKind { ChannelKind::Telegram }
+    fn kind(&self) -> ChannelKind {
+        ChannelKind::Telegram
+    }
     async fn send(&self, _msg: OutgoingMessage) -> Result<(), ChannelError> {
         Err(ChannelError::NotConnected)
     }
@@ -191,10 +213,13 @@ pub struct ChannelRegistry {
 }
 
 impl ChannelRegistry {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     pub fn register(&mut self, adapter: Arc<dyn ChannelAdapter>) {
-        self.by_scheme.insert(adapter.kind().scheme().to_string(), adapter);
+        self.by_scheme
+            .insert(adapter.kind().scheme().to_string(), adapter);
     }
 
     pub fn schemes(&self) -> Vec<String> {
@@ -204,7 +229,9 @@ impl ChannelRegistry {
     /// Route a message to the adapter implied by the `address` prefix.
     pub async fn send(&self, msg: OutgoingMessage) -> Result<(), ChannelError> {
         let scheme = msg.address.split(':').next().unwrap_or("").to_string();
-        let adapter = self.by_scheme.get(&scheme)
+        let adapter = self
+            .by_scheme
+            .get(&scheme)
             .ok_or(ChannelError::Unknown(scheme))?
             .clone();
         adapter.send(msg).await
@@ -212,8 +239,10 @@ impl ChannelRegistry {
 }
 
 pub fn now_ms() -> u64 {
-    SystemTime::now().duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_millis() as u64).unwrap_or(0)
+    SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
 }
 
 #[cfg(test)]
@@ -225,8 +254,12 @@ mod tests {
         let cli = CliChannel::new();
         let mut reg = ChannelRegistry::new();
         reg.register(cli.clone());
-        reg.send(OutgoingMessage::text("cli:default", "hello")).await.unwrap();
-        reg.send(OutgoingMessage::text("cli:default", "world")).await.unwrap();
+        reg.send(OutgoingMessage::text("cli:default", "hello"))
+            .await
+            .unwrap();
+        reg.send(OutgoingMessage::text("cli:default", "world"))
+            .await
+            .unwrap();
         let log = cli.log().await;
         assert_eq!(log.len(), 2);
         assert_eq!(log[0].text, "hello");

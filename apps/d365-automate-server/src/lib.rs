@@ -20,7 +20,6 @@ pub mod tools;
 use std::sync::Arc;
 use std::time::Duration;
 
-use mcp_server::Server;
 use d365_automate_graph::InMemoryGraph;
 use d365_automate_ingest::{EmbeddingClient, MockEmbedder};
 use d365_automate_kb::{InMemoryKb, KnowledgeStore};
@@ -29,6 +28,7 @@ use d365_automate_observability::{AuditLog, JsonStderrSink};
 use d365_automate_odata::{D365Client, MetadataCache, MockD365Client};
 use d365_automate_rag::{GraphEngine, MockReranker, RagEngine};
 use d365_automate_skills::SkillRegistry;
+use mcp_server::Server;
 
 pub use context::ServerContext;
 
@@ -60,7 +60,9 @@ pub async fn build_test_server(opts: TestServerOptions) -> (Server, Arc<ServerCo
     let store: Arc<dyn KnowledgeStore> = Arc::new(InMemoryKb::new());
     let embedder: Arc<dyn EmbeddingClient> = Arc::new(MockEmbedder::new(opts.embedding_dim));
     if opts.seed_kb {
-        seed::populate_with_embeddings(&store, embedder.as_ref()).await.expect("seed");
+        seed::populate_with_embeddings(&store, embedder.as_ref())
+            .await
+            .expect("seed");
     }
     let rag = Arc::new(RagEngine::new(store.clone()).with_reranker(Arc::new(MockReranker::new())));
 
@@ -97,14 +99,28 @@ pub async fn build_test_server(opts: TestServerOptions) -> (Server, Arc<ServerCo
         .exposure(policy)
         .instructions("integration test".to_string());
 
-    for desc in tools::rag_tools(&ctx) { builder = builder.tool(desc); }
-    for desc in tools::service_tools(&ctx) { builder = builder.tool(desc); }
-    for desc in tools::meta_tools(&ctx) { builder = builder.tool(desc); }
-    for desc in tools::graph_tools(&ctx) { builder = builder.tool(desc); }
-    for desc in tools::workflow_tools(&ctx) { builder = builder.tool(desc); }
-    for desc in resources::all(&ctx) { builder = builder.resource(desc); }
+    for desc in tools::rag_tools(&ctx) {
+        builder = builder.tool(desc);
+    }
+    for desc in tools::service_tools(&ctx) {
+        builder = builder.tool(desc);
+    }
+    for desc in tools::meta_tools(&ctx) {
+        builder = builder.tool(desc);
+    }
+    for desc in tools::graph_tools(&ctx) {
+        builder = builder.tool(desc);
+    }
+    for desc in tools::workflow_tools(&ctx) {
+        builder = builder.tool(desc);
+    }
+    for desc in resources::all(&ctx) {
+        builder = builder.resource(desc);
+    }
     let skills = SkillRegistry::new();
-    for desc in prompts::all(&skills) { builder = builder.prompt(desc); }
+    for desc in prompts::all(&skills) {
+        builder = builder.prompt(desc);
+    }
     builder = register_completers(builder);
 
     (builder.build(), ctx)
@@ -115,7 +131,8 @@ pub async fn build_test_server(opts: TestServerOptions) -> (Server, Arc<ServerCo
 pub fn register_completers(builder: mcp_server::ServerBuilder) -> mcp_server::ServerBuilder {
     let starts_with = |options: &[&'static str], prefix: &str| -> Vec<String> {
         let p = prefix.to_ascii_lowercase();
-        options.iter()
+        options
+            .iter()
             .filter(|o| o.to_ascii_lowercase().starts_with(&p))
             .map(|o| (*o).to_string())
             .collect()
@@ -123,7 +140,10 @@ pub fn register_completers(builder: mcp_server::ServerBuilder) -> mcp_server::Se
     builder
         // Cross-reference review: object kind enum.
         .completer("xpp.review-cross-reference", "kind", move |prefix, _| {
-            starts_with(&["class", "interface", "table", "data_entity", "job", "form"], prefix)
+            starts_with(
+                &["class", "interface", "table", "data_entity", "job", "form"],
+                prefix,
+            )
         })
         // Deploy impact analysis: target environment.
         .completer("d365.deploy-impact-analysis", "scope", move |prefix, _| {

@@ -14,15 +14,21 @@ pub enum Id {
 }
 
 impl From<i64> for Id {
-    fn from(n: i64) -> Self { Self::Number(n) }
+    fn from(n: i64) -> Self {
+        Self::Number(n)
+    }
 }
 
 impl From<String> for Id {
-    fn from(s: String) -> Self { Self::String(s) }
+    fn from(s: String) -> Self {
+        Self::String(s)
+    }
 }
 
 impl From<&str> for Id {
-    fn from(s: &str) -> Self { Self::String(s.to_string()) }
+    fn from(s: &str) -> Self {
+        Self::String(s.to_string())
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -75,11 +81,21 @@ pub struct Response {
 
 impl Response {
     pub fn success(id: Id, result: Value) -> Self {
-        Self { jsonrpc: JSONRPC_VERSION.to_string(), id, result: Some(result), error: None }
+        Self {
+            jsonrpc: JSONRPC_VERSION.to_string(),
+            id,
+            result: Some(result),
+            error: None,
+        }
     }
 
     pub fn failure(id: Id, error: ErrorObject) -> Self {
-        Self { jsonrpc: JSONRPC_VERSION.to_string(), id, result: None, error: Some(error) }
+        Self {
+            jsonrpc: JSONRPC_VERSION.to_string(),
+            id,
+            result: None,
+            error: Some(error),
+        }
     }
 }
 
@@ -94,7 +110,11 @@ pub struct ErrorObject {
 
 impl ErrorObject {
     pub fn new(code: i32, message: impl Into<String>) -> Self {
-        Self { code, message: message.into(), data: None }
+        Self {
+            code,
+            message: message.into(),
+            data: None,
+        }
     }
 
     pub fn with_data(mut self, data: Value) -> Self {
