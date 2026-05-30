@@ -10,6 +10,34 @@ GaussianTech. See [`PORTING.md`](PORTING.md) for the phased strategy.
 
 ---
 
+## [0.9.1] — 2026-05-30 · Feature-parity pass + README
+
+A gap analysis against [`sap-automate`](https://github.com/rismanmattotorang/sap-automate)
+closed the remaining deltas so every source feature has a Dynamics 365 analog.
+
+### Added
+
+- **`xpp.meta.get_form`** tool — completes the X++/AOT reader set, bringing the
+  tool surface to **37** (33 read-only + 4 gated writes), at parity with the
+  source's 37; the `MockMetadataClient` now seeds a `GTFinJournalForm` fixture.
+- **`scheduler.toml`** — Dynamics 365 monitoring jobs consumed by
+  `d365-automate-gw --scheduler-config`.
+- **`docs/COMPARISON.md`** and **`docs/PRODUCTION_PLAN.md`** — D365-grounded
+  comparative analysis and production-readiness assessment.
+
+### Changed
+
+- README revised as a Gaussian Technologies deep-tech product page; resource
+  count corrected to 14.
+
+### Parity note
+
+The only un-ported source artifacts are binary/marketing assets with no
+functional role: the whitepaper PDF, the `docs/web-screens/` PNGs, and the
+`docs/tui-rag-tab.html` snapshot.
+
+---
+
 ## [0.9.0] — 2026-05-30 · Live HTTP transports (Phase 3b)
 
 Implements the live Dynamics 365 clients behind the `http` feature; the server

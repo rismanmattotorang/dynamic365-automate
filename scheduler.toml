@@ -1,0 +1,31 @@
+# Declared Dynamics 365 monitoring jobs. Each fires through the gateway
+# (`d365-automate-gw --scheduler-config scheduler.toml`), hits an MCP tool,
+# and posts the result to the declared channel (when an adapter is registered).
+
+[[jobs]]
+name = "solution_checker_weekly_summary"
+tool = "d365.docs.search"
+channel = "cli:fin-ops"
+arguments = { query = "Solution Checker best-practice findings recent", top_k = 3 }
+schedule = { kind = "weekly", weekday = 1, hour = 8, minute = 0 }
+
+[[jobs]]
+name = "solution_eol_quarterly"
+tool = "kb.global_query"
+channel = "cli:platform-arch"
+arguments = { query = "Dataverse solutions years-to-EOL", top_k = 3 }
+schedule = { kind = "quarterly", day = 1, hour = 9, minute = 0 }
+
+[[jobs]]
+name = "period_close_daily"
+tool = "d365.docs.search"
+channel = "cli:fin-ops"
+arguments = { query = "financial period close FiscalCalendarPeriod reconciliation", top_k = 3 }
+schedule = { kind = "daily", hour = 7, minute = 30 }
+
+[[jobs]]
+name = "deploy_uat_hourly"
+tool = "d365.docs.search"
+channel = "cli:platform-eng"
+arguments = { query = "apply deployable package LCS database synchronize", top_k = 2 }
+schedule = { kind = "hourly", minute = 15 }

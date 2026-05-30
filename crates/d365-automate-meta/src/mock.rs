@@ -91,6 +91,12 @@ impl MockMetadataClient {
             "// table LedgerJournalTrans\n// fields: JournalNum, LineNum, LedgerDimension, AmountCurDebit, AmountCurCredit, DataAreaId\n",
         ));
 
+        // Forms
+        self.forms.insert("GTFinJournalForm".into(), obj(
+            "GTFinJournalForm", XppObjectKind::Form, "GTFin", "General journal entry form",
+            "[Form]\npublic class GTFinJournalForm extends FormRun\n{\n    // data sources: LedgerJournalTable, LedgerJournalTrans\n}\n",
+        ));
+
         // Data entities
         self.data_entities.insert("LedgerJournalLineEntity".into(), DataEntityView {
             name: "LedgerJournalLineEntity".into(),

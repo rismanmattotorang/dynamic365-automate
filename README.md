@@ -35,7 +35,7 @@ Dynamics 365 Finance & Operations runs the ledgers, supply chains, and order boo
 An **agentic operating system for Dynamics 365**, exposed over the [Model Context Protocol](https://modelcontextprotocol.io) (2025‑06‑18). Drop it into Claude, Cursor, or any MCP client and the agent gets a typed, guard‑railed surface over your environment:
 
 - **37 production tools** across OData services, data entities, X++/AOT metadata, a cross‑domain knowledge graph, and gated write workflows.
-- **12 resources** and **16 prompts** — including **13 declarative skills** (period‑close investigation, SoD audit, extension audit, X++ review, deploy‑impact analysis, …) loaded straight from disk.
+- **14 resources** and **16 prompts** — including **13 declarative skills** (period‑close investigation, SoD audit, extension audit, X++ review, deploy‑impact analysis, …) loaded straight from disk.
 - **Sub‑millisecond hybrid retrieval** (dense + BM25 + RRF + cross‑encoder rerank) and **multi‑hop graph reasoning** (GraphRAG · HippoRAG · RAPTOR).
 
 ### Built on three convictions
@@ -64,7 +64,7 @@ An **agentic operating system for Dynamics 365**, exposed over the [Model Contex
 ├──────────────────────────────────────────────────────────────────────┤
 │  MCP transports: stdio · HTTP+SSE                                    │  mcp-transport
 ├──────────────────────────────────────────────────────────────────────┤
-│  MCP server: 37 tools · 12 resources · 16 prompts · elicitation      │  d365-automate-server
+│  MCP server: 37 tools · 14 resources · 16 prompts · elicitation      │  d365-automate-server
 ├──────────────────────────────────────────────────────────────────────┤
 │  RAG engine: dense + BM25 + RRF + cross-encoder reranker             │  d365-automate-rag
 │  Graph engine: GraphRAG (Louvain) · HippoRAG (PPR) · RAPTOR          │  d365-automate-graph

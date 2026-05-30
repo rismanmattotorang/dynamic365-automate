@@ -61,6 +61,7 @@ async fn read_only_hides_write_tools_but_shows_reads() {
     assert!(names.contains(&"d365.entity.read"), "have: {names:?}");
     assert!(names.contains(&"d365.service.metadata"));
     assert!(names.contains(&"xpp.meta.get_class"));
+    assert!(names.contains(&"xpp.meta.get_form"));
     assert!(names.contains(&"kb.multi_hop"));
     // Write tools hidden under the read-only exposure policy.
     assert!(

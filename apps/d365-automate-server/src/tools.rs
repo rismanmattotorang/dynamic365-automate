@@ -935,6 +935,12 @@ pub fn meta_tools(ctx: &Arc<ServerContext>) -> Vec<ToolDescriptor> {
             "Retrieve X++ job source.",
             MetaKind::Job,
         ),
+        meta_get(
+            ctx,
+            "xpp.meta.get_form",
+            "Retrieve X++ form definition.",
+            MetaKind::Form,
+        ),
         meta_get_data_entity(ctx),
         meta_get_model_contents(ctx),
         meta_search(ctx),
@@ -948,6 +954,7 @@ pub fn meta_tools(ctx: &Arc<ServerContext>) -> Vec<ToolDescriptor> {
 enum MetaKind {
     Class,
     Interface,
+    Form,
     Table,
     Job,
 }
@@ -982,6 +989,7 @@ fn meta_get(ctx: &Arc<ServerContext>, name: &str, desc: &str, kind: MetaKind) ->
                 MetaKind::Interface => ctx.meta_client.get_interface(&args.name).await,
                 MetaKind::Table => ctx.meta_client.get_table(&args.name).await,
                 MetaKind::Job => ctx.meta_client.get_job(&args.name).await,
+                MetaKind::Form => ctx.meta_client.get_form(&args.name).await,
             };
             match result {
                 Ok(p) => render_json(&tool_name, &p),
