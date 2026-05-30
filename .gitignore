@@ -1,0 +1,15 @@
+/target
+**/*.rs.bk
+Cargo.lock.bak
+.DS_Store
+*.swp
+.env
+.env.local
+node_modules/
+.next/
+dist/
+.turbo/
+.eslintcache
+# Live Dynamics 365 connection files hold credentials — never commit them.
+.d365-automate/connections/
+*.connection.toml

@@ -1,0 +1,82 @@
+[workspace]
+resolver = "2"
+members = [
+    # ── MCP protocol foundation (ERP-agnostic) ──────────────────────────
+    "crates/mcp-core",
+    "crates/mcp-transport",
+    "crates/mcp-server",
+    "crates/mcp-client",
+    # ── Dynamics 365 crates land in later porting phases (see PORTING.md):
+    #   "crates/d365-automate-odata",       # Phase 3 — F&O OData/Custom Service client
+    #   "crates/d365-automate-meta",        # Phase 3 — X++/AOT metadata client
+    #   "crates/d365-automate-kb",          # Phase 2
+    #   "crates/d365-automate-rag",         # Phase 2
+    #   "crates/d365-automate-graph",       # Phase 2
+    #   "crates/d365-automate-ingest",      # Phase 2
+    #   "crates/d365-automate-memory",      # Phase 2
+    #   "crates/d365-automate-skills",      # Phase 2
+    #   "crates/d365-automate-scheduler",   # Phase 2
+    #   "crates/d365-automate-channels",    # Phase 2
+    #   "crates/d365-automate-connectors",  # Phase 2
+    #   "crates/d365-automate-observability",# Phase 2
+    #   "apps/d365-automate-server",        # Phase 4
+    #   "apps/d365-automate-ingest",        # Phase 5
+    #   "apps/d365-automate-bench",         # Phase 5
+    #   "apps/d365-automate-tui",           # Phase 5
+    #   "apps/d365-automate-gw",            # Phase 5
+    #   "apps/sample-server",               # Phase 5
+    #   "apps/sample-client",               # Phase 5
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.80"
+license = "Apache-2.0"
+repository = "https://github.com/rismanmattotorang/dynamic365-automate"
+
+[workspace.dependencies]
+# Async runtime
+tokio = { version = "1.40", features = ["full"] }
+tokio-util = { version = "0.7", features = ["codec"] }
+futures = "0.3"
+async-trait = "0.1"
+pin-project-lite = "0.2"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Errors / utility
+thiserror = "1"
+anyhow = "1"
+
+# Observability
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Internal crates — MCP foundation (ERP-agnostic)
+mcp-core = { path = "crates/mcp-core" }
+mcp-transport = { path = "crates/mcp-transport" }
+mcp-server = { path = "crates/mcp-server" }
+mcp-client = { path = "crates/mcp-client" }
+
+# HTTP / web
+axum = "0.7"
+tower = "0.5"
+tower-http = { version = "0.6", features = ["trace", "cors"] }
+quick-xml = { version = "0.36", features = ["serialize"] }
+toml = "0.8"
+ratatui = "0.28"
+crossterm = "0.28"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream", "cookies"] }
+url = "2"
+scraper = "0.20"
+sha2 = "0.10"
+hex = "0.4"
+clap = { version = "4", features = ["derive"] }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
