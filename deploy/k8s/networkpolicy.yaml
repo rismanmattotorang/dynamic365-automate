@@ -1,0 +1,61 @@
+# Default-deny + allow-list pattern.  Anything not explicitly permitted
+# below is rejected.  Hardens the perimeter so a compromised pod can't
+# pivot to other namespaces or to Dynamics 365 over an unexpected port.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: d365-automate-server-deny-all
+  namespace: d365-automate
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: d365-automate-server
+  policyTypes:
+    - Ingress
+    - Egress
+  # Ingress: only the namespace's own ingress-controller / gateway.
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              network/gateway: "true"
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: d365-automate-gw
+      ports:
+        - port: 3030
+          protocol: TCP
+  # Egress: DNS + Dynamics 365 / Entra ID (HTTPS 443) + observability collector.
+  egress:
+    # Cluster DNS
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    # Dynamics 365 (OData / Metadata API) + Microsoft Entra ID token endpoint.
+    # Both are public HTTPS endpoints; restrict egress to 443.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0          # tighten to Microsoft service tags per environment
+      ports:
+        - port: 443                 # HTTPS — *.operations.dynamics.com + login.microsoftonline.com
+          protocol: TCP
+    # OTLP collector
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: observability
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: otel-collector
+      ports:
+        - port: 4317
+          protocol: TCP

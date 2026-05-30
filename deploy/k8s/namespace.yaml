@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: d365-automate
+  labels:
+    name: d365-automate
+    app.kubernetes.io/part-of: d365-automate

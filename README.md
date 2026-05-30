@@ -39,7 +39,7 @@
 | 4 | MCP server: tools / resources / prompts / seed | ✅ Done — 137 tests passing; binary serves stdio + HTTP |
 | 5 | Apps (TUI, gateway, ingest, bench, samples) | ✅ Done — all six binaries build & run; bench passes acceptance gates |
 | 6 | Web UI (Next.js) | ✅ Done — `next build` passes (9 routes) |
-| 7 | Deploy & CI | ⏳ Planned |
+| 7 | Deploy & CI | ✅ Done — Dockerfile, k8s, Grafana, CI/release workflows |
 | 8 | Skills & docs | ⏳ Planned |
 
 See **[`PORTING.md`](PORTING.md)** for the phase-by-phase strategy, the full

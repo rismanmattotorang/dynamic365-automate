@@ -181,9 +181,10 @@ only as they land, so the tree always compiles.
 - Re-grounded all demo content: tool names (`d365.*` / `xpp.meta.*`), the Operations tool grouping + synthetic traffic, the Query Lab domain selector (`learn`/`xpp`/`flow`/`solution`) + example queries + URI colour map, the Graph Lab entity-kind colours + examples, and the Skill Lab copy.
 - **Exit:** `npm install` + `npx next build` succeed — all 9 routes compile and TypeScript type-checks pass. ✅ *Done — see CHANGELOG 0.6.0.*
 
-### Phase 7 — Deploy & CI
-- `deploy/Dockerfile`, `deploy/k8s/*`, Grafana dashboard, `.github/workflows/{ci,release}.yml`, example connection TOML — rebranded image/paths/env.
-- **Exit:** CI workflow green on the branch.
+### ✅ Phase 7 — Deploy & CI *(done)*
+- `deploy/Dockerfile` (multi-stage, distroless/nonroot; builds `d365-automate-server` + `d365-automate-gw`), `deploy/k8s/*` (namespace, configmap with prod AGENTS.md, Entra-creds secret template, 3-replica deployment, ClientIP service, latency HPA 3–12, default-deny NetworkPolicy egress to HTTPS/Entra, PDB, Kustomize), `deploy/grafana/d365-automate-overview.json` (metrics rebranded), `deploy/d365-automate-connection.example.toml`.
+- `.github/workflows/ci.yml` — fmt, clippy (`--all-targets`), test matrix (stable/beta), **Dynamics 365 correctness invariants** job (runs the 7 odata precision tests), bench acceptance gate (`d365-automate-bench --graph`), cargo-audit, Docker build, kubeconform, and the Next.js web build. `release.yml` — multi-arch binaries + GHCR image + GitHub Release. The Phase-3b `http` feature flags were dropped from CI (default build covers the mock path).
+- **Exit:** k8s YAML + workflows + Grafana JSON all parse; the exact Docker build command (`--bin d365-automate-server --bin d365-automate-gw`) compiles; image refs consistent. ✅ *Done — see CHANGELOG 0.7.0.*
 
 ### Phase 8 — Skills & docs
 - Rewrite the 13 skills for D365 (e.g. `period-close-investigation`→D365 ledger close, `abap-code-review`→X++ code review, `clean-core-audit`→over-layering/extension audit, `transport-release-elicit`→package-deploy elicit, `odata-service-design`→D365 data-entity design).

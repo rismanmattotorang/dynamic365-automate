@@ -10,6 +10,44 @@ GaussianTech. See [`PORTING.md`](PORTING.md) for the phased strategy.
 
 ---
 
+## [0.7.0] — 2026-05-30 · Deploy & CI (Phase 7)
+
+Ports the deployment manifests and CI/release pipelines, rebranded for
+Dynamics 365 / GaussianTech.
+
+### Added — `deploy/`
+
+- `Dockerfile` — multi-stage build on `rust:slim` → distroless/nonroot;
+  builds `d365-automate-server` + `d365-automate-gw`.
+- `k8s/` — namespace, ConfigMap (production AGENTS.md + `D365_AUTOMATE_*`
+  env), Entra-credentials Secret template (`D365_RESOURCE` / `D365_TENANT_ID`
+  / `D365_CLIENT_ID` / `D365_CLIENT_SECRET` / `D365_LEGAL_ENTITY`), 3-replica
+  Deployment (read-only root FS, dropped caps), ClientIP-affinity Service,
+  latency HPA (3–12), default-deny NetworkPolicy (egress restricted to
+  HTTPS / Entra), PodDisruptionBudget, Kustomization. Image
+  `ghcr.io/gaussiantech/d365-automate`.
+- `grafana/d365-automate-overview.json` — metrics rebranded
+  (`d365_service_calls_total`, `d365_pool_in_use`, `d365_authz_denied_total`).
+- `d365-automate-connection.example.toml` — live-connection template.
+
+### Added — `.github/workflows/`
+
+- `ci.yml` — fmt, clippy (`--all-targets`), test matrix (stable/beta), a
+  **Dynamics 365 correctness invariants** job running the 7 odata precision
+  tests, the bench acceptance gate (`d365-automate-bench --graph`),
+  cargo-audit, Docker build, kubeconform manifest lint, and the Next.js build.
+- `release.yml` — multi-arch (x86_64 + aarch64) binaries, GHCR image push,
+  and a GitHub Release.
+
+### Verified
+
+- All k8s YAML, both workflows, and the Grafana JSON parse cleanly.
+- The exact Docker build command (`cargo build --release --bin
+  d365-automate-server --bin d365-automate-gw`) compiles; image references are
+  consistent across kustomization + deployment.
+
+---
+
 ## [0.6.0] — 2026-05-30 · Web UI (Phase 6)
 
 Ports the Next.js 14 operator console (`apps/web`) and re-grounds it in D365.
