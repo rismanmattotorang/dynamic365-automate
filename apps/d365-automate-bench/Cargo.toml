@@ -1,0 +1,22 @@
+[package]
+name = "d365-automate-bench"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Phase 3 acceptance harness: P50/P95/P99 latency over the pilot corpus."
+
+[[bin]]
+name = "d365-automate-bench"
+path = "src/main.rs"
+
+[dependencies]
+d365-automate-kb = { workspace = true }
+d365-automate-rag = { workspace = true }
+d365-automate-ingest = { workspace = true }
+d365-automate-graph = { workspace = true }
+tokio = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+anyhow = { workspace = true }
+clap = { workspace = true }

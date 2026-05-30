@@ -1,0 +1,349 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { initialize, listTools, listResources, listPrompts, callTool, parseToolJson, Tool, Prompt } from '@/lib/mcp';
+import { Badge, Card, PageHeader } from '@/components/badge';
+
+interface ToolStat {
+  name: string;
+  calls: number;
+  errors: number;
+  totalLatencyMs: number;
+  lastLatencyMs?: number;
+  description?: string;
+  isWrite?: boolean;
+}
+
+interface CacheStats {
+  enabled: boolean;
+  hits?: number;
+  misses?: number;
+  entries?: number;
+  evictions?: number;
+  hit_ratio?: number;
+}
+
+export default function Operations() {
+  const [server, setServer] = useState<{ name: string; version: string } | null>(null);
+  const [protocolVersion, setProtocolVersion] = useState('');
+  const [instructions, setInstructions] = useState('');
+  const [tools, setTools] = useState<Tool[]>([]);
+  const [resourceCount, setResourceCount] = useState(0);
+  const [prompts, setPrompts] = useState<Prompt[]>([]);
+  const [stats, setStats] = useState<Record<string, ToolStat>>({});
+  const [cache, setCache] = useState<CacheStats | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [pinging, setPinging] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const init = await initialize();
+        setServer(init.serverInfo);
+        setProtocolVersion(init.protocolVersion);
+        setInstructions(init.instructions ?? '');
+        const t = await listTools();
+        setTools(t.tools);
+        const r = await listResources();
+        setResourceCount(r.resources.length);
+        const p = await listPrompts();
+        setPrompts(p.prompts);
+      } catch (e: any) {
+        setError(e.message);
+      }
+    })();
+  }, []);
+
+  // Poll the Service metadata cache stats every 2 s (TTL-decorator
+  // pattern, surfaced through `d365.env.cache_stats`).
+  useEffect(() => {
+    if (!server) return;
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const r = await callTool('d365.env.cache_stats', {});
+        const parsed = parseToolJson<CacheStats>(r);
+        if (!cancelled && parsed) setCache(parsed);
+      } catch {
+        // Tool may not exist on older servers — fail soft.
+      }
+      if (!cancelled) setTimeout(tick, 2000);
+    };
+    tick();
+    return () => { cancelled = true; };
+  }, [server]);
+
+  // Synthetic background traffic so the dashboard isn't dead on first load.
+  useEffect(() => {
+    if (!server || tools.length === 0) return;
+    let cancelled = false;
+
+    const samples = [
+      { tool: 'd365.docs.search', args: { query: 'period close', top_k: 3 } },
+      { tool: 'd365.docs.search', args: { query: 'goods movement', top_k: 3 } },
+      { tool: 'xpp.search', args: { query: 'GTFin journal', top_k: 3 } },
+      { tool: 'd365.learn.search', args: { query: 'billing', top_k: 3 } },
+      { tool: 'd365.env.info', args: {} },
+      { tool: 'd365.service.search', args: { query: 'material' } },
+    ];
+
+    let i = 0;
+    const tick = async () => {
+      if (cancelled) return;
+      const probe = samples[i++ % samples.length];
+      const t0 = performance.now();
+      try {
+        const r = await callTool(probe.tool, probe.args);
+        const latency = performance.now() - t0;
+        setStats((prev) => {
+          const cur = prev[probe.tool] ?? { name: probe.tool, calls: 0, errors: 0, totalLatencyMs: 0 };
+          return {
+            ...prev,
+            [probe.tool]: {
+              ...cur,
+              calls: cur.calls + 1,
+              errors: cur.errors + (r.isError ? 1 : 0),
+              totalLatencyMs: cur.totalLatencyMs + latency,
+              lastLatencyMs: latency,
+            },
+          };
+        });
+      } catch (e: any) {
+        setStats((prev) => {
+          const cur = prev[probe.tool] ?? { name: probe.tool, calls: 0, errors: 0, totalLatencyMs: 0 };
+          return { ...prev, [probe.tool]: { ...cur, errors: cur.errors + 1, calls: cur.calls + 1 } };
+        });
+      }
+      setPinging(false);
+      if (!cancelled) setTimeout(tick, 600);
+    };
+    tick();
+    return () => { cancelled = true; };
+  }, [server, tools.length]);
+
+  const totalCalls = Object.values(stats).reduce((s, x) => s + x.calls, 0);
+  const totalErrors = Object.values(stats).reduce((s, x) => s + x.errors, 0);
+  const meanLatency = totalCalls > 0
+    ? Object.values(stats).reduce((s, x) => s + x.totalLatencyMs, 0) / totalCalls
+    : 0;
+  const budgetPct = Math.min(100, (meanLatency / 80) * 100);
+  const budgetTone = budgetPct < 40 ? 'good' : budgetPct < 80 ? 'warn' : 'bad';
+
+  const toolsByGroup = groupTools(tools);
+
+  return (
+    <>
+      <PageHeader
+        title="Operations"
+        subtitle={server ? `${server.name} v${server.version} · MCP ${protocolVersion}` : 'connecting…'}
+        right={
+          <div className="flex items-center gap-2">
+            <Badge tone={pinging ? 'warn' : 'good'}>{pinging ? 'probing' : 'live'}</Badge>
+            <Badge tone="neutral">{tools.length} tools</Badge>
+            <Badge tone="neutral">{resourceCount} resources</Badge>
+            <Badge tone="neutral">{prompts.length} prompts</Badge>
+          </div>
+        }
+      />
+
+      <div className="p-6 space-y-6 max-w-[1500px]">
+        {error && (
+          <div className="text-sm text-bad bg-bad/10 border border-bad/30 rounded px-3 py-2">
+            Server not reachable: {error}<br />
+            <span className="text-xs text-ink-600">
+              Start it with: <code className="text-accent-500">./target/release/d365-automate-server --transport http</code>
+            </span>
+          </div>
+        )}
+
+        {/* Hero stats */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Stat label="Total calls" value={totalCalls.toString()} tone="accent" />
+          <Stat label="Errors" value={totalErrors.toString()} tone={totalErrors === 0 ? 'good' : totalErrors > 3 ? 'bad' : 'warn'} />
+          <Stat label="Mean latency" value={`${meanLatency.toFixed(1)} ms`} tone={budgetTone} />
+          <Stat label="P95 gate" value="80 ms" tone="good" />
+        </div>
+
+        {/* Latency budget gauge */}
+        <Card title="Latency budget (paper §X-D acceptance gate)">
+          <div className="space-y-2">
+            <div className="text-xs text-zinc-400">
+              Mean latency ÷ 80 ms gate: <span className="font-bold text-zinc-100">{budgetPct.toFixed(1)}%</span>
+            </div>
+            <div className="h-3 rounded-full bg-ink-800 overflow-hidden">
+              <div
+                className={`h-full transition-all ${
+                  budgetTone === 'good' ? 'bg-good' : budgetTone === 'warn' ? 'bg-warn' : 'bg-bad'
+                }`}
+                style={{ width: `${budgetPct}%` }}
+              />
+            </div>
+            <div className="text-[11px] text-ink-600">
+              Server-side P95 over 1000 queries: <b>~0.16 ms</b> (Phase 3 bench harness, 500× under gate).
+              The browser/proxy round-trip you see here is the full UX cost.
+            </div>
+          </div>
+        </Card>
+
+        {/* Service metadata cache (TTL pattern) */}
+        <Card
+          title="Service metadata cache"
+          right={
+            cache?.enabled === false
+              ? <Badge tone="warn">disabled</Badge>
+              : cache && cache.hit_ratio !== undefined
+                ? <Badge tone={cache.hit_ratio >= 0.8 ? 'good' : cache.hit_ratio >= 0.5 ? 'warn' : 'bad'}>{(cache.hit_ratio * 100).toFixed(1)}% hit ratio</Badge>
+                : <Badge tone="neutral">polling…</Badge>
+          }
+        >
+          {cache?.enabled === false ? (
+            <div className="text-xs text-ink-600">
+              Cache disabled. Restart the server with <code className="text-accent-500">--metadata-cache-ttl-secs &gt; 0</code> to enable.
+            </div>
+          ) : cache ? (
+            <div>
+              <div className="grid grid-cols-4 gap-3">
+                <CacheStat label="Hits" value={cache.hits ?? 0} tone="good" />
+                <CacheStat label="Misses" value={cache.misses ?? 0} tone="warn" />
+                <CacheStat label="Entries" value={cache.entries ?? 0} tone="accent" />
+                <CacheStat label="Evictions" value={cache.evictions ?? 0} tone="neutral" />
+              </div>
+              <div className="mt-3 h-2 rounded-full bg-ink-800 overflow-hidden">
+                <div
+                  className={`h-full transition-all ${
+                    (cache.hit_ratio ?? 0) >= 0.8 ? 'bg-good' : (cache.hit_ratio ?? 0) >= 0.5 ? 'bg-warn' : 'bg-bad'
+                  }`}
+                  style={{ width: `${((cache.hit_ratio ?? 0) * 100).toFixed(0)}%` }}
+                />
+              </div>
+              <div className="mt-2 text-[11px] text-ink-600">
+                TTL-decorator pattern — cached metadata reads are ~1–5 ms vs ~200–500 ms direct.
+                Resource: <code className="text-accent-500">d365-cache://stats</code> · tools: <code className="text-accent-500">d365.env.cache_stats</code>, <code className="text-accent-500">d365.env.cache_invalidate</code>.
+              </div>
+            </div>
+          ) : (
+            <div className="text-xs text-ink-600">Polling cache stats…</div>
+          )}
+        </Card>
+
+        {/* Tool catalogue grouped */}
+        <Card title="Tool catalogue (grouped by domain)">
+          <div className="space-y-4">
+            {Object.entries(toolsByGroup).map(([group, ts]) => (
+              <div key={group}>
+                <div className="text-xs uppercase tracking-wide text-ink-600 mb-1.5">{group} · {ts.length}</div>
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
+                  {ts.map((t) => {
+                    const s = stats[t.name];
+                    return (
+                      <div key={t.name} className="border border-ink-800 rounded p-2 bg-ink-950">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-bold text-accent-500 text-[12.5px] truncate">{t.name}</span>
+                          {s && <span className="ml-auto text-[10px] text-zinc-400">{s.calls} calls</span>}
+                        </div>
+                        <p className="text-[11px] text-ink-600 leading-snug line-clamp-2">
+                          {t.description ?? 'no description'}
+                        </p>
+                        {s && s.lastLatencyMs !== undefined && (
+                          <div className="text-[10px] text-zinc-500 mt-1">
+                            last: {s.lastLatencyMs.toFixed(1)} ms · mean: {(s.totalLatencyMs / Math.max(1, s.calls)).toFixed(1)} ms
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Skills */}
+          <Card title="Skills loaded from disk">
+            <ul className="space-y-1.5">
+              {prompts.filter(p => p.name.startsWith('d365.skill.')).map(p => (
+                <li key={p.name} className="text-xs">
+                  <span className="text-accent-500 font-semibold">{p.name}</span>
+                  <span className="text-zinc-500"> — {p.description}</span>
+                </li>
+              ))}
+              {prompts.filter(p => p.name.startsWith('d365.skill.')).length === 0 && (
+                <li className="text-xs text-ink-600">No skills loaded.</li>
+              )}
+            </ul>
+            <div className="mt-3 text-[11px] text-ink-600">
+              Drop a markdown file into <code className="text-accent-500">./skills/*.md</code> with YAML frontmatter and it becomes an MCP prompt.
+            </div>
+          </Card>
+
+          {/* Instructions / AGENTS.md */}
+          <Card title="Server instructions (AGENTS.md + capability summary)">
+            <pre className="text-[11px] text-zinc-400 whitespace-pre-wrap leading-relaxed max-h-72 overflow-auto scrollbar-thin">
+              {instructions || '(no instructions)'}
+            </pre>
+          </Card>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function CacheStat({ label, value, tone }: { label: string; value: number; tone: 'good' | 'warn' | 'bad' | 'accent' | 'neutral' }) {
+  const valueTone = {
+    good: 'text-good',
+    warn: 'text-warn',
+    bad: 'text-bad',
+    accent: 'text-accent-500',
+    neutral: 'text-zinc-300',
+  }[tone];
+  return (
+    <div className="rounded border border-ink-800 bg-ink-950 px-3 py-2">
+      <div className="text-[10.5px] text-ink-600 uppercase tracking-wide">{label}</div>
+      <div className={`text-lg font-bold ${valueTone}`}>{value.toLocaleString()}</div>
+    </div>
+  );
+}
+
+function Stat({ label, value, tone }: { label: string; value: string; tone: 'good' | 'warn' | 'bad' | 'accent' }) {
+  const borderTone = {
+    good: 'border-good/30',
+    warn: 'border-warn/30',
+    bad: 'border-bad/30',
+    accent: 'border-accent-500/30',
+  }[tone];
+  const valueTone = {
+    good: 'text-good',
+    warn: 'text-warn',
+    bad: 'text-bad',
+    accent: 'text-accent-500',
+  }[tone];
+  return (
+    <div className={`rounded-lg border ${borderTone} bg-ink-900 px-4 py-3`}>
+      <div className="text-[11px] text-ink-600 uppercase tracking-wide">{label}</div>
+      <div className={`text-2xl font-bold ${valueTone} mt-1`}>{value}</div>
+    </div>
+  );
+}
+
+function groupTools(tools: Tool[]): Record<string, Tool[]> {
+  const groups: Record<string, Tool[]> = {
+    'RAG search': [],
+    'D365 service / OData / entities': [],
+    'X++ metadata': [],
+    'Knowledge graph': [],
+    'Other': [],
+  };
+  for (const t of tools) {
+    if (t.name.startsWith('xpp.meta.')) groups['X++ metadata'].push(t);
+    else if (t.name.startsWith('kb.')) groups['Knowledge graph'].push(t);
+    else if (t.name.startsWith('d365.')) groups['D365 service / OData / entities'].push(t);
+    else if (['xpp.search', 'flow.find_process', 'app.search_solutions', 'd365.learn.search'].includes(t.name)) groups['RAG search'].push(t);
+    else groups['Other'].push(t);
+  }
+  for (const k of Object.keys(groups)) {
+    if (groups[k].length === 0) delete groups[k];
+    else groups[k].sort((a, b) => a.name.localeCompare(b.name));
+  }
+  return groups;
+}

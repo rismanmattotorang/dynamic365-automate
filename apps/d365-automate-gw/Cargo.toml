@@ -1,0 +1,26 @@
+[package]
+name = "d365-automate-gw"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Phase 8 multi-channel gateway binary: route channel-initiated queries through MCP tool calls (paper §IX-B + §X-K)."
+
+[[bin]]
+name = "d365-automate-gw"
+path = "src/main.rs"
+
+[dependencies]
+mcp-core = { workspace = true }
+mcp-client = { workspace = true }
+mcp-transport = { workspace = true }
+d365-automate-channels = { workspace = true }
+d365-automate-scheduler = { workspace = true }
+d365-automate-memory = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+anyhow = { workspace = true }
+clap = { workspace = true }
+async-trait = { workspace = true }

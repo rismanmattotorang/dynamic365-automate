@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: d365-automate-server
+  namespace: d365-automate
+  labels:
+    app.kubernetes.io/name: d365-automate-server
+    app.kubernetes.io/part-of: d365-automate
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: d365-automate-server
+  ports:
+    - name: http
+      port: 3030
+      targetPort: http
+      protocol: TCP
+  # Sticky sessions are important — the paper §IV-K reference deployment
+  # uses consistent hashing on `mcp-session-id`.  ClusterIP supports
+  # `sessionAffinity: ClientIP` as a coarse first step; the real
+  # session-aware routing lives in the Envoy/Istio sidecar config (see
+  # `helm/d365-automate/templates/envoyfilter.yaml` for an example).
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 3600

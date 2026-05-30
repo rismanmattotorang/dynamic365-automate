@@ -101,13 +101,18 @@ impl HttpServerTransport {
             async move {
                 match r {
                     Some(f) => (
-                        [(axum::http::header::CONTENT_TYPE, "text/plain; version=0.0.4")],
+                        [(
+                            axum::http::header::CONTENT_TYPE,
+                            "text/plain; version=0.0.4",
+                        )],
                         f(),
-                    ).into_response(),
+                    )
+                        .into_response(),
                     None => (
                         axum::http::StatusCode::NOT_FOUND,
                         "metrics endpoint not configured",
-                    ).into_response(),
+                    )
+                        .into_response(),
                 }
             }
         });
@@ -119,20 +124,25 @@ impl HttpServerTransport {
             .route("/metrics", metrics_route)
             .with_state(state);
 
-        let listener = tokio::net::TcpListener::bind(config.bind).await
+        let listener = tokio::net::TcpListener::bind(config.bind)
+            .await
             .map_err(mcp_core::Error::Io)?;
         info!(addr = %config.bind, "MCP HTTP transport listening");
 
         let (tx, rx) = oneshot::channel::<()>();
         let task = tokio::spawn(async move {
-            let server = axum::serve(listener, app)
-                .with_graceful_shutdown(async move { let _ = rx.await; });
+            let server = axum::serve(listener, app).with_graceful_shutdown(async move {
+                let _ = rx.await;
+            });
             if let Err(e) = server.await {
                 warn!("HTTP server: {e}");
             }
         });
 
-        Ok(HttpServerHandle { shutdown: Some(tx), task })
+        Ok(HttpServerHandle {
+            shutdown: Some(tx),
+            task,
+        })
     }
 }
 
@@ -175,7 +185,11 @@ where
     match dispatch(parsed).await {
         Some(reply) => {
             let body = serde_json::to_string(&reply).unwrap_or_else(|_| "{}".into());
-            ([(axum::http::header::CONTENT_TYPE, "application/json")], body).into_response()
+            (
+                [(axum::http::header::CONTENT_TYPE, "application/json")],
+                body,
+            )
+                .into_response()
         }
         None => axum::http::StatusCode::ACCEPTED.into_response(),
     }
@@ -279,14 +293,19 @@ mod tests {
     #[test]
     fn populated_allowlist_rejects_missing_origin() {
         let allowed = vec!["http://localhost:3000".into()];
-        assert!(!check_origin(&allowed, &HeaderMap::new()),
-            "no Origin header must be rejected when an allowlist is configured");
+        assert!(
+            !check_origin(&allowed, &HeaderMap::new()),
+            "no Origin header must be rejected when an allowlist is configured"
+        );
     }
 
     #[test]
     fn populated_allowlist_accepts_matching_origin() {
         let allowed = vec!["http://localhost:3000".into()];
-        assert!(check_origin(&allowed, &h("origin", "http://localhost:3000")));
+        assert!(check_origin(
+            &allowed,
+            &h("origin", "http://localhost:3000")
+        ));
     }
 
     #[test]
@@ -301,7 +320,10 @@ mod tests {
         // do exact-string match — operators get the behaviour they
         // configured, not silent case folding.
         let allowed = vec!["http://Localhost:3000".into()];
-        assert!(!check_origin(&allowed, &h("origin", "http://localhost:3000")));
+        assert!(!check_origin(
+            &allowed,
+            &h("origin", "http://localhost:3000")
+        ));
     }
 
     #[test]
@@ -316,6 +338,9 @@ mod tests {
 
     #[test]
     fn check_auth_accepts_matching_bearer() {
-        assert!(check_auth(&Some("secret".into()), &h("authorization", "Bearer secret")));
+        assert!(check_auth(
+            &Some("secret".into()),
+            &h("authorization", "Bearer secret")
+        ));
     }
 }

@@ -11,9 +11,8 @@ use mcp_core::{
     jsonrpc::{ErrorObject, Message, Request, Response},
     protocol::{
         methods, CallToolParams, CallToolResult, ClientCapabilities, ElicitationAction,
-        ElicitationParams, ElicitationResult, Implementation, InitializeParams,
-        InitializeResult, ListPromptsResult, ListResourcesResult, ListToolsResult,
-        PROTOCOL_VERSION,
+        ElicitationParams, ElicitationResult, Implementation, InitializeParams, InitializeResult,
+        ListPromptsResult, ListResourcesResult, ListToolsResult, PROTOCOL_VERSION,
     },
     Error, Id, Result,
 };
@@ -42,7 +41,10 @@ pub struct DeclineAll;
 #[async_trait]
 impl ElicitationDelegate for DeclineAll {
     async fn on_elicit(&self, _params: ElicitationParams) -> ElicitationResult {
-        ElicitationResult { action: ElicitationAction::Decline, content: None }
+        ElicitationResult {
+            action: ElicitationAction::Decline,
+            content: None,
+        }
     }
 }
 
@@ -104,8 +106,11 @@ impl Client {
                                 let mut p = pending_io.lock().await;
                                 p.remove(&n)
                             };
-                            if let Some(w) = waiter { let _ = w.send(r); }
-                            else { debug!(id = n, "response with no waiter"); }
+                            if let Some(w) = waiter {
+                                let _ = w.send(r);
+                            } else {
+                                debug!(id = n, "response with no waiter");
+                            }
                         } else {
                             warn!("client: response with non-numeric id");
                         }
@@ -263,7 +268,9 @@ impl Client {
             capabilities,
             client_info,
         };
-        let result: InitializeResult = self.call(methods::INITIALIZE, Some(serde_json::to_value(params)?)).await?;
+        let result: InitializeResult = self
+            .call(methods::INITIALIZE, Some(serde_json::to_value(params)?))
+            .await?;
         self.notify(methods::INITIALIZED, None).await?;
         *self.server_info.lock().await = Some(result.clone());
         Ok(result)
@@ -278,8 +285,12 @@ impl Client {
     }
 
     pub async fn call_tool(&self, name: &str, arguments: Option<Value>) -> Result<CallToolResult> {
-        let params = CallToolParams { name: name.into(), arguments };
-        self.call(methods::TOOLS_CALL, Some(serde_json::to_value(params)?)).await
+        let params = CallToolParams {
+            name: name.into(),
+            arguments,
+        };
+        self.call(methods::TOOLS_CALL, Some(serde_json::to_value(params)?))
+            .await
     }
 
     pub async fn list_resources(&self) -> Result<ListResourcesResult> {
@@ -288,23 +299,37 @@ impl Client {
 
     pub async fn read_resource(&self, uri: &str) -> Result<mcp_core::ReadResourceResult> {
         let params = mcp_core::ReadResourceParams { uri: uri.into() };
-        self.call(methods::RESOURCES_READ, Some(serde_json::to_value(params)?)).await
+        self.call(methods::RESOURCES_READ, Some(serde_json::to_value(params)?))
+            .await
     }
 
     pub async fn list_prompts(&self) -> Result<ListPromptsResult> {
         self.call(methods::PROMPTS_LIST, None).await
     }
 
-    pub async fn get_prompt(&self, name: &str, arguments: Option<Value>) -> Result<mcp_core::protocol::GetPromptResult> {
-        let params = mcp_core::protocol::GetPromptParams { name: name.into(), arguments };
-        self.call(methods::PROMPTS_GET, Some(serde_json::to_value(params)?)).await
+    pub async fn get_prompt(
+        &self,
+        name: &str,
+        arguments: Option<Value>,
+    ) -> Result<mcp_core::protocol::GetPromptResult> {
+        let params = mcp_core::protocol::GetPromptParams {
+            name: name.into(),
+            arguments,
+        };
+        self.call(methods::PROMPTS_GET, Some(serde_json::to_value(params)?))
+            .await
     }
 
     /// Set the minimum log severity the server will emit via
     /// `notifications/message`.  MCP 2025-06-18 logging utility.
     pub async fn set_log_level(&self, level: mcp_core::LogLevel) -> Result<()> {
         let params = mcp_core::SetLevelParams { level };
-        let _: Value = self.call(methods::LOGGING_SET_LEVEL, Some(serde_json::to_value(params)?)).await?;
+        let _: Value = self
+            .call(
+                methods::LOGGING_SET_LEVEL,
+                Some(serde_json::to_value(params)?),
+            )
+            .await?;
         Ok(())
     }
 
@@ -318,19 +343,29 @@ impl Client {
         typed_value: &str,
     ) -> Result<mcp_core::CompleteResult> {
         let params = mcp_core::CompleteParams {
-            reference: mcp_core::CompletionRef::Prompt { name: prompt_name.into() },
+            reference: mcp_core::CompletionRef::Prompt {
+                name: prompt_name.into(),
+            },
             argument: mcp_core::CompletionArgumentRef {
                 name: argument_name.into(),
                 value: typed_value.into(),
             },
         };
-        self.call(methods::COMPLETION_COMPLETE, Some(serde_json::to_value(params)?)).await
+        self.call(
+            methods::COMPLETION_COMPLETE,
+            Some(serde_json::to_value(params)?),
+        )
+        .await
     }
 
     /// Issue an arbitrary JSON-RPC call.  Useful for raw spec exercises
     /// in tests and for forwards-compat methods not yet wrapped by a
     /// typed helper.
-    pub async fn raw_request<R: DeserializeOwned>(&self, method: &str, params: Option<Value>) -> Result<R> {
+    pub async fn raw_request<R: DeserializeOwned>(
+        &self,
+        method: &str,
+        params: Option<Value>,
+    ) -> Result<R> {
         self.call(method, params).await
     }
 
@@ -363,11 +398,14 @@ impl Client {
 
         let response = rx.await.map_err(|_| Error::TransportClosed)?;
         if let Some(err) = response.error {
-            return Err(Error::Protocol { code: err.code, message: err.message });
+            return Err(Error::Protocol {
+                code: err.code,
+                message: err.message,
+            });
         }
-        let result_value = response.result.ok_or_else(|| {
-            Error::protocol(ErrorCode::InvalidRequest, "response missing result")
-        })?;
+        let result_value = response
+            .result
+            .ok_or_else(|| Error::protocol(ErrorCode::InvalidRequest, "response missing result"))?;
         let parsed: R = serde_json::from_value(result_value)?;
         Ok(parsed)
     }
@@ -384,29 +422,39 @@ async fn handle_server_request(
     let id = req.id.clone();
     let response = match req.method.as_str() {
         methods::ELICITATION_CREATE => {
-            let params: ElicitationParams = match req.params
-                .and_then(|p| serde_json::from_value(p).ok())
-            {
-                Some(p) => p,
-                None => {
-                    let err = ErrorObject::new(ErrorCode::InvalidParams.as_i32(), "invalid elicitation params");
-                    return drop(outbox.send(Message::Response(Response::failure(id, err))).await);
-                }
-            };
+            let params: ElicitationParams =
+                match req.params.and_then(|p| serde_json::from_value(p).ok()) {
+                    Some(p) => p,
+                    None => {
+                        let err = ErrorObject::new(
+                            ErrorCode::InvalidParams.as_i32(),
+                            "invalid elicitation params",
+                        );
+                        return drop(
+                            outbox
+                                .send(Message::Response(Response::failure(id, err)))
+                                .await,
+                        );
+                    }
+                };
             let result = delegate.on_elicit(params).await;
             match serde_json::to_value(result) {
                 Ok(v) => Response::success(id, v),
-                Err(e) => Response::failure(id, ErrorObject::new(
-                    ErrorCode::InternalError.as_i32(), e.to_string()
-                )),
+                Err(e) => Response::failure(
+                    id,
+                    ErrorObject::new(ErrorCode::InternalError.as_i32(), e.to_string()),
+                ),
             }
         }
         other => {
             warn!(method = %other, "server-initiated request: method not supported by this client");
-            Response::failure(id, ErrorObject::new(
-                ErrorCode::MethodNotFound.as_i32(),
-                format!("method '{other}' not supported by client"),
-            ))
+            Response::failure(
+                id,
+                ErrorObject::new(
+                    ErrorCode::MethodNotFound.as_i32(),
+                    format!("method '{other}' not supported by client"),
+                ),
+            )
         }
     };
     let _ = outbox.send(Message::Response(response)).await;

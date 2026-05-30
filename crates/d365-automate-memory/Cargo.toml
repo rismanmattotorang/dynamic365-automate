@@ -1,0 +1,17 @@
+[package]
+name = "d365-automate-memory"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "D365-Automate four-tier memory: working, episodic, semantic, procedural (Phase 8)."
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

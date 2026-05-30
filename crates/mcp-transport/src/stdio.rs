@@ -36,8 +36,14 @@ where
     /// inside a `tokio::select!`).
     pub fn into_parts(self) -> (StdioReader<R>, StdioWriter<W>) {
         (
-            StdioReader { reader: self.reader, line: self.line },
-            StdioWriter { writer: self.writer, closed: false },
+            StdioReader {
+                reader: self.reader,
+                line: self.line,
+            },
+            StdioWriter {
+                writer: self.writer,
+                closed: false,
+            },
         )
     }
 }
@@ -50,15 +56,20 @@ pub struct StdioReader<R> {
 }
 
 impl<R> StdioReader<R>
-where R: AsyncRead + Unpin + Send + 'static
+where
+    R: AsyncRead + Unpin + Send + 'static,
 {
     pub async fn recv(&mut self) -> Result<Option<Message>> {
         loop {
             self.line.clear();
             let n = self.reader.read_line(&mut self.line).await?;
-            if n == 0 { return Ok(None); }
+            if n == 0 {
+                return Ok(None);
+            }
             let trimmed = self.line.trim();
-            if trimmed.is_empty() { continue; }
+            if trimmed.is_empty() {
+                continue;
+            }
             return Ok(Some(Message::from_json(trimmed.as_bytes())?));
         }
     }
@@ -71,10 +82,13 @@ pub struct StdioWriter<W> {
 }
 
 impl<W> StdioWriter<W>
-where W: AsyncWrite + Unpin + Send + 'static
+where
+    W: AsyncWrite + Unpin + Send + 'static,
 {
     pub async fn send(&mut self, message: Message) -> Result<()> {
-        if self.closed { return Err(Error::TransportClosed); }
+        if self.closed {
+            return Err(Error::TransportClosed);
+        }
         let bytes = serde_json::to_vec(&message)?;
         self.writer.write_all(&bytes).await?;
         self.writer.write_all(b"\n").await?;
@@ -83,7 +97,10 @@ where W: AsyncWrite + Unpin + Send + 'static
     }
 
     pub async fn close(&mut self) {
-        if !self.closed { self.closed = true; let _ = self.writer.shutdown().await; }
+        if !self.closed {
+            self.closed = true;
+            let _ = self.writer.shutdown().await;
+        }
     }
 }
 
@@ -150,11 +167,7 @@ mod tests {
         let mut a = StdioTransport::new(a_r, a_w);
         let mut b = StdioTransport::new(b_r, b_w);
 
-        let req = Message::Request(Request::new(
-            Id::Number(1),
-            "ping",
-            None,
-        ));
+        let req = Message::Request(Request::new(Id::Number(1), "ping", None));
 
         a.send(req).await.unwrap();
         let got = b.recv().await.unwrap().unwrap();

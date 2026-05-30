@@ -145,38 +145,55 @@ only as they land, so the tree always compiles.
 - Port `mcp-core`, `mcp-transport`, `mcp-server`, `mcp-client` verbatim; strip the handful of `sap` doc/env references.
 - **Exit:** 18 MCP tests pass. ✅ *Done — see CHANGELOG 0.1.0.*
 
-### Phase 2 — ERP-agnostic engines + agentic layer
-- Port `rag`, `graph`, `kb`, `ingest`, `memory`, `scheduler`, `channels`, `observability`, `connectors` as `d365-automate-*`.
-- Mechanical rename; re-target the ingest crawler allowlist to `learn.microsoft.com`; remap connector traits (`AbapConnector`→`XppConnector`, keep `BpmnConnector` for Power Automate flows, `LeanixConnector`→`SolutionConnector`).
-- **Exit:** retrieval/graph/crawler unit tests pass under new names.
+### ✅ Phase 2 — ERP-agnostic engines + agentic layer *(done)*
+- Ported `rag`, `graph`, `kb`, `ingest`, `memory`, `scheduler`, `channels`, `observability`, `skills`, `connectors` as `d365-automate-*`.
+- Re-grounded the domain surfaces in Dynamics 365 canon:
+  - `graph::EntityKind` (`AbapObject`→`XppObject`, `Table`→`DataEntity`, `Rfc`→`Service`, `BpmnProcess`→`Flow`, `LeanixApp`→`Solution`, `HelpPage`→`LearnPage`) + `EdgeKind` (`ReadsTable`→`ReadsEntity`, `WritesTable`→`WritesEntity`, `Includes`→`Uses`).
+  - The seed knowledge graph: the SAP FI journal-posting fixture (ABAP→BAPI→DDIC→LeanIX) re-cast as a Dynamics 365 GL posting fixture (`GTFinPostJournal` X++ job → `LedgerGeneralJournalEntry` service → `LedgerJournalTrans`/`GeneralJournalAccountEntry` entities → `FIN-CORE` solution).
+  - `kb::Domain` (`SapHelp`→`Learn`, `Abap`→`Xpp`, `Bpmn`→`Flow`, `Leanix`→`Solution`).
+  - Ingest crawler retargeted to Microsoft Learn (`HelpPortalCrawler`→`LearnCrawler`, `parse_help_portal_html`→`parse_learn_html`, `help.sap.com`→`learn.microsoft.com`); demo corpus re-grounded in D365 Finance.
+  - Connector traits (`AbapConnector`→`XppConnector`, `BpmnConnector`→`FlowConnector`, `LeanixConnector`→`SolutionConnector`).
+  - Observability audit field `sap_system`→`environment`; metrics `sap_rfc_calls_total`→`d365_service_calls_total`, etc.
+- **Exit:** 86 tests pass, clippy clean. ✅ *Done — see CHANGELOG 0.2.0.*
 
-### Phase 3 — Dynamics 365 backend tier *(the core engineering)*
-- **`d365-automate-odata`** (was `sap-automate-rfc`): F&O OData v4 client, Custom Service caller, `$batch` change-set transaction model, Entra OAuth2 client-credentials auth, metadata cache, retry/pool, Infolog/error taxonomy. Replaces RFC/BAPI/SOAP-RFC.
-- **`d365-automate-meta`** (was `sap-automate-adt`): Metadata API client (`DataEntities`, `EntityMetadatas`), X++ object readers, cross-reference (`where_used`), gated build/deploy, HTTP + mock clients, fixture tests.
-- Re-ground all fixtures (entities, services, security) in D365 canon; port correctness tests per §4.
-- **Exit:** mock-client fixture tests + D365 precision tests pass.
+### ✅ Phase 3 — Dynamics 365 backend tier *(done; live transports → 3b)*
+- **`d365-automate-odata`** (was `sap-automate-rfc`): the `D365Client` trait (mirrors `SapClient`) + `MockD365Client` with GL/SCM/Sales fixtures; `$batch` change-set transaction model (replaces `BAPI_TRANSACTION_COMMIT`); `infolog` parser (replaces `bapiret2`); Entra ID OAuth2 credential providers; metadata-cache decorator; pool; retry/circuit-breaker; `D365Error` taxonomy.
+- **`d365-automate-meta`** (was `sap-automate-adt`): the `MetadataClient` trait (mirrors `AdtClient`) + `MockMetadataClient` with the GTFin/GTScm X++ fixtures; `XppObjectKind` (AOT object kinds); cross-reference (`where_used`); gated `deploy` (`activate`); `MetaError` taxonomy; connection model with Entra auth.
+- Re-grounded fixtures (entities, services, security) in D365 canon and ported the correctness invariants per §4 (`every_write_operation_uses_changeset`, `every_company_scoped_entity_has_dataareaid_key`, `general_journal_account_entry_is_the_subledger_truth`, …).
+- **Exit:** 130 tests pass (44 new), clippy clean. ✅ *Done — see CHANGELOG 0.3.0.*
 
-### Phase 4 — MCP server (tools / resources / prompts / seed)
-- Re-map the 37 tools to `d365.*` / `xpp.meta.*` (full crosswalk in §6), 12 resources to `d365-*://`, 16 prompts, and the seed corpus.
-- Read-only-by-default safety gate, `--enable-writes`, `AGENTS.md` loader, elicitation workflows.
-- **Exit:** server integration tests pass; `tools/list` shows the D365 surface.
+### ✅ Phase 3b — live transports *(done)*
+- **`HttpD365Client`** (`d365-automate-odata`, feature `http`): live F&O OData v4 client over **Microsoft Entra ID** OAuth2 client-credentials (token cache), entity reads (`$select`/`$filter`/`$top` with `dataAreaId` injection, `like`→`contains` translation), unbound OData action POSTs, structured status→error mapping. Metadata/search/structure are served from the curated catalogue so the read-only safety annotations stay stable; data ops are live.
+- **`HttpMetadataClient`** (`d365-automate-meta`, feature `http`): live Metadata API reads (`/metadata/...`, `/data/...`) over Entra OAuth2, plus a TOML **connection-file loader** (`load_connection`). `deploy` is gated and points to LCS; `cross_reference` is documented as not exposed over this transport.
+- **Server wiring:** the binary selects live-vs-mock at runtime — `HttpD365Client::from_env()` when `D365_RESOURCE` is set, `HttpMetadataClient` when `--connection <name>` resolves to a non-mock connection file — otherwise the offline mocks. Backends remain `Arc<dyn …>` so the swap is one site.
+- **Exit:** `http`-feature builds + 56 unit tests pass (URL/query/`$batch`/token/error builders, connection round-trip); clippy clean; live backend verified to activate via env (Entra OAuth2, secret redacted). CI exercises the `http` feature. ✅ *Done — see CHANGELOG 0.9.0.*
 
-### Phase 5 — Apps
-- `d365-automate-tui` (Ratatui console), `d365-automate-gw` (gateway), `d365-automate-ingest`, `d365-automate-bench`, `sample-server`/`sample-client`.
-- **Exit:** all binaries build; bench runs against the seeded corpus.
+### ✅ Phase 4 — MCP server (tools / resources / prompts / seed) *(done)*
+- `apps/d365-automate-server`: re-mapped the tool surface to `d365.*` / `xpp.meta.*` per §6 (37 tools across rag / service / meta / graph / workflow groups), resources to `d365-*://` (env, entity, service, meta, cache, guardrails), prompts (`d365.review-service-call`, `d365.deploy-impact-analysis`, `xpp.review-cross-reference` + disk-loaded skills), and the D365 seed corpus.
+- Read-only-by-default exposure policy, `--enable-writes`, `AGENTS.md` loader, atomic `$batch` commit path on `d365.service.call`, audit logging, and the three elicitation workflows (`create_purchase_order`, `maintain_customer`, `deploy_package`).
+- **Swappable backends (per request):** the server holds `Arc<dyn D365Client>` + `Arc<dyn MetadataClient>`, defaulting to the mocks. Pointing at a live environment is a one-site change in `lib.rs` / `main.rs` (construct the Phase 3b `HttpD365Client` instead of the mock) — no tool/resource/prompt code changes.
+- **Exit:** binary runs (stdio + HTTP `/health`, `/metrics`, `/mcp`); 137 tests pass (7 new server integration tests), clippy clean. ✅ *Done — see CHANGELOG 0.4.0.*
 
-### Phase 6 — Web UI
-- Rebrand the Next.js app (Operations / Query Lab / Graph Lab / Tool Explorer / Skill Lab / Resources); relabel SAP→D365 throughout.
-- **Exit:** `next build` succeeds; routes render against the HTTP server.
+### ✅ Phase 5 — Apps *(done)*
+- Ported `d365-automate-tui` (Ratatui console), `d365-automate-gw` (multi-channel gateway), `d365-automate-ingest` (CLI), `d365-automate-bench`, and `sample-server`/`sample-client`.
+- Re-grounded: TUI synthetic traffic + cache panel, gateway intent router / `match_skill` (D365 skills + keywords) and tool routing, bench workload queries (RAG + graph) and the `./docs/sample-learn-corpus`, ingest crawler (`LearnCrawler`). `sample-client`/`gw` spawn `d365-automate-server` by default.
+- **Exit:** all six binaries build; clippy clean across `--all-targets`; bench passes both acceptance gates against the seeded Learn corpus (RAG P95 0.074 ms, graph multi-hop P95 0.084 ms); `sample-client` drives the server and lists the full D365 tool surface; 137 tests pass. ✅ *Done — see CHANGELOG 0.5.0.*
 
-### Phase 7 — Deploy & CI
-- `deploy/Dockerfile`, `deploy/k8s/*`, Grafana dashboard, `.github/workflows/{ci,release}.yml`, example connection TOML — rebranded image/paths/env.
-- **Exit:** CI workflow green on the branch.
+### ✅ Phase 6 — Web UI *(done)*
+- Ported the Next.js 14 app (`apps/web`): Operations, Query Lab, Graph Lab, Tool Explorer, Skill Lab, Resources. Rebranded to D365-Automate; the `/api/mcp` proxy targets the D365 server.
+- Re-grounded all demo content: tool names (`d365.*` / `xpp.meta.*`), the Operations tool grouping + synthetic traffic, the Query Lab domain selector (`learn`/`xpp`/`flow`/`solution`) + example queries + URI colour map, the Graph Lab entity-kind colours + examples, and the Skill Lab copy.
+- **Exit:** `npm install` + `npx next build` succeed — all 9 routes compile and TypeScript type-checks pass. ✅ *Done — see CHANGELOG 0.6.0.*
 
-### Phase 8 — Skills & docs
-- Rewrite the 13 skills for D365 (e.g. `period-close-investigation`→D365 ledger close, `abap-code-review`→X++ code review, `clean-core-audit`→over-layering/extension audit, `transport-release-elicit`→package-deploy elicit, `odata-service-design`→D365 data-entity design).
-- Port `docs/` (ARCHITECTURE, ROADMAP, INTEGRATION, CORRECTNESS, RUNBOOK, COMPARISON).
-- **Exit:** every skill auto-loads as an MCP prompt; docs reference D365 canon.
+### ✅ Phase 7 — Deploy & CI *(done)*
+- `deploy/Dockerfile` (multi-stage, distroless/nonroot; builds `d365-automate-server` + `d365-automate-gw`), `deploy/k8s/*` (namespace, configmap with prod AGENTS.md, Entra-creds secret template, 3-replica deployment, ClientIP service, latency HPA 3–12, default-deny NetworkPolicy egress to HTTPS/Entra, PDB, Kustomize), `deploy/grafana/d365-automate-overview.json` (metrics rebranded), `deploy/d365-automate-connection.example.toml`.
+- `.github/workflows/ci.yml` — fmt, clippy (`--all-targets`), test matrix (stable/beta), **Dynamics 365 correctness invariants** job (runs the 7 odata precision tests), bench acceptance gate (`d365-automate-bench --graph`), cargo-audit, Docker build, kubeconform, and the Next.js web build. `release.yml` — multi-arch binaries + GHCR image + GitHub Release. The Phase-3b `http` feature flags were dropped from CI (default build covers the mock path).
+- **Exit:** k8s YAML + workflows + Grafana JSON all parse; the exact Docker build command (`--bin d365-automate-server --bin d365-automate-gw`) compiles; image refs consistent. ✅ *Done — see CHANGELOG 0.7.0.*
+
+### ✅ Phase 8 — Skills & docs *(done)*
+- Rewrote the 13 skills for Dynamics 365 (`skills/*.md`): `period_close_investigation` (ledger close), `xpp_code_review` (was abap-code-review), `extension_audit` (was clean-core-audit — over-layering vs extensions), `package_deploy_elicit` (was transport-release-elicit), `data_entity_design` (was odata-service-design), `deploy_impact_analysis` (was transport-impact-analysis), `synapse_link_migration` (was bw-to-datasphere), `custom_service_scaffolding` (was rap-service-scaffolding), `security_sod_audit`, `po_creation_elicit`, `customer_master_elicit`, `aipnv_ai_pairing`, `karpathy_guidelines` — all named `d365.skill.*` and wired to the D365 tool surface.
+- Wired `main.rs` to scan `./skills` (+ `./.d365-automate/skills`, `~/.config/d365-automate/skills`) so each becomes an MCP prompt.
+- Ported the docs: `docs/D365_CORRECTNESS.md`, `docs/INTEGRATION.md`, `docs/ROADMAP.md`, `docs/RUNBOOK_DEV_ENVIRONMENT.md`.
+- **Exit:** the server loads **13 skills** → `prompts/list` shows **16 prompts** (13 skills + 3 built-ins), verified via `sample-client --list`. ✅ *Done — see CHANGELOG 0.8.0.*
 
 ---
 

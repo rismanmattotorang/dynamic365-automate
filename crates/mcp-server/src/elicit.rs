@@ -79,7 +79,9 @@ impl ElicitationHandle {
 
     /// Returns true if the connected client advertised elicitation
     /// capability and the transport can carry server-initiated requests.
-    pub fn is_enabled(&self) -> bool { self.inner.enabled }
+    pub fn is_enabled(&self) -> bool {
+        self.inner.enabled
+    }
 
     /// Send an elicitation request and await the user's response.
     /// On any failure (transport closed, client declined, malformed
@@ -89,7 +91,10 @@ impl ElicitationHandle {
     pub async fn elicit(&self, message: &str, requested_schema: Value) -> ElicitationResult {
         if !self.inner.enabled {
             debug!("elicitation requested but disabled; returning Decline");
-            return ElicitationResult { action: ElicitationAction::Decline, content: None };
+            return ElicitationResult {
+                action: ElicitationAction::Decline,
+                content: None,
+            };
         }
         let id = self.inner.next_id.fetch_add(1, Ordering::Relaxed);
         let (tx, rx) = oneshot::channel();
@@ -105,22 +110,41 @@ impl ElicitationHandle {
             Ok(v) => v,
             Err(e) => {
                 warn!("elicitation: failed to serialise params: {e}");
-                return ElicitationResult { action: ElicitationAction::Cancel, content: None };
+                return ElicitationResult {
+                    action: ElicitationAction::Cancel,
+                    content: None,
+                };
             }
         };
-        let req = Request::new(Id::Number(id), methods::ELICITATION_CREATE, Some(params_value));
-        if self.inner.outbound.send(Message::Request(req)).await.is_err() {
+        let req = Request::new(
+            Id::Number(id),
+            methods::ELICITATION_CREATE,
+            Some(params_value),
+        );
+        if self
+            .inner
+            .outbound
+            .send(Message::Request(req))
+            .await
+            .is_err()
+        {
             warn!("elicitation: outbound channel closed");
             // Drop the waiter, return Cancel.
             self.inner.pending.lock().await.remove(&id);
-            return ElicitationResult { action: ElicitationAction::Cancel, content: None };
+            return ElicitationResult {
+                action: ElicitationAction::Cancel,
+                content: None,
+            };
         }
 
         match rx.await {
             Ok(resp) => Self::parse_response(resp),
             Err(_) => {
                 debug!("elicitation: waiter dropped");
-                ElicitationResult { action: ElicitationAction::Cancel, content: None }
+                ElicitationResult {
+                    action: ElicitationAction::Cancel,
+                    content: None,
+                }
             }
         }
     }
@@ -146,14 +170,23 @@ impl ElicitationHandle {
 
     fn parse_response(resp: Response) -> ElicitationResult {
         if resp.error.is_some() {
-            return ElicitationResult { action: ElicitationAction::Cancel, content: None };
+            return ElicitationResult {
+                action: ElicitationAction::Cancel,
+                content: None,
+            };
         }
         let Some(value) = resp.result else {
-            return ElicitationResult { action: ElicitationAction::Cancel, content: None };
+            return ElicitationResult {
+                action: ElicitationAction::Cancel,
+                content: None,
+            };
         };
         serde_json::from_value::<ElicitationResult>(value).unwrap_or_else(|_| {
             warn!("elicitation: client returned malformed result; treating as Cancel");
-            ElicitationResult { action: ElicitationAction::Cancel, content: None }
+            ElicitationResult {
+                action: ElicitationAction::Cancel,
+                content: None,
+            }
         })
     }
 }
@@ -172,7 +205,10 @@ pub fn current_context() -> Option<ToolContext> {
 pub async fn elicit(message: &str, requested_schema: Value) -> ElicitationResult {
     match current_context() {
         Some(ctx) => ctx.elicit.elicit(message, requested_schema).await,
-        None => ElicitationResult { action: ElicitationAction::Decline, content: None },
+        None => ElicitationResult {
+            action: ElicitationAction::Decline,
+            content: None,
+        },
     }
 }
 

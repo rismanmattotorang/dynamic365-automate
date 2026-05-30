@@ -7,13 +7,13 @@
 use async_trait::async_trait;
 use mcp_core::{Message, Result};
 
-pub mod stdio;
 #[cfg(feature = "http")]
 pub mod http;
+pub mod stdio;
 
-pub use stdio::StdioTransport;
 #[cfg(feature = "http")]
-pub use http::{HttpServerTransport, HttpServerHandle, HttpServerConfig};
+pub use http::{HttpServerConfig, HttpServerHandle, HttpServerTransport};
+pub use stdio::StdioTransport;
 
 /// Bidirectional, framed MCP transport.
 ///
