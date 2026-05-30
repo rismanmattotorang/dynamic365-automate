@@ -20,8 +20,8 @@ members = [
     # ── Dynamics 365 backend tier (Phase 3) ─────────────────────────────
     "crates/d365-automate-odata",
     "crates/d365-automate-meta",
-    # ── Apps land in later porting phases (see PORTING.md):
-    #   "apps/d365-automate-server",        # Phase 4
+    # ── MCP server (Phase 4) ────────────────────────────────────────────
+    "apps/d365-automate-server",
     #   "apps/d365-automate-ingest",        # Phase 5
     #   "apps/d365-automate-bench",         # Phase 5
     #   "apps/d365-automate-tui",           # Phase 5
@@ -31,7 +31,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 rust-version = "1.80"
 license = "Apache-2.0"

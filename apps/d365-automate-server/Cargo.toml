@@ -1,0 +1,39 @@
+[package]
+name = "d365-automate-server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "D365-Automate MCP server: Dynamics 365 OData/Metadata tools, resources, and prompts."
+
+[[bin]]
+name = "d365-automate-server"
+path = "src/main.rs"
+
+[lib]
+name = "d365_automate_server_lib"
+path = "src/lib.rs"
+
+[dependencies]
+mcp-core = { workspace = true }
+mcp-transport = { workspace = true, features = ["http"] }
+mcp-server = { workspace = true }
+d365-automate-odata = { workspace = true }
+d365-automate-meta = { workspace = true }
+d365-automate-kb = { workspace = true }
+d365-automate-rag = { workspace = true }
+d365-automate-graph = { workspace = true }
+d365-automate-ingest = { workspace = true }
+d365-automate-skills = { workspace = true }
+d365-automate-observability = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+clap = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+[dev-dependencies]
+mcp-client = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

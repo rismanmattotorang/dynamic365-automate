@@ -36,7 +36,7 @@
 | 1 | MCP protocol core (`mcp-core/-transport/-server/-client`) | ✅ Done — 18 tests passing |
 | 2 | ERP-agnostic engines + agentic layer (`kb`/`rag`/`graph`/`ingest`/`memory`/`scheduler`/`channels`/`skills`/`observability`/`connectors`) | ✅ Done — 86 tests passing |
 | 3 | Dynamics 365 backend tier (`d365-automate-odata`, `d365-automate-meta`) | ✅ Done — 130 tests passing (live HTTP transports → 3b) |
-| 4 | MCP server: tools / resources / prompts / seed | ⏳ Planned |
+| 4 | MCP server: tools / resources / prompts / seed | ✅ Done — 137 tests passing; binary serves stdio + HTTP |
 | 5 | Apps (TUI, gateway, ingest, bench, samples) | ⏳ Planned |
 | 6 | Web UI (Next.js) | ⏳ Planned |
 | 7 | Deploy & CI | ⏳ Planned |
@@ -48,19 +48,28 @@ invariants.
 
 ---
 
-## Quick start (current foundation)
+## Quick start
 
 ```bash
-# Build the MCP protocol foundation (Rust 1.80+).
-cargo build --all-features
+# Build everything (Rust 1.80+).
+cargo build --release
 
-# Run the protocol test suite.
-cargo test --all-features
+# Single binary, stdio MCP server — drop into Claude Code, Cursor, or any MCP client.
+./target/release/d365-automate-server
+
+# Or HTTP for browser / remote agents.
+./target/release/d365-automate-server --transport http --bind 127.0.0.1:3030
+curl http://127.0.0.1:3030/health      # → "ok"
+curl http://127.0.0.1:3030/metrics     # → Prometheus exposition
+
+# Enable the gated write tools (elicitation workflows, $batch commits).
+./target/release/d365-automate-server --enable-writes
 ```
 
-The Dynamics 365 server binary, tools, and web UI land in later phases (see the
-status table). Until then the workspace ships the protocol core that everything
-else is built on.
+The server runs against the **offline Dynamics 365 mocks** by default, so it is
+fully exercisable without an environment. Pointing it at a live tenant is a
+one-site swap (see [`PORTING.md`](PORTING.md) §3b / `apps/d365-automate-server/src/lib.rs`).
+The web UI lands in a later phase (see the status table).
 
 ---
 

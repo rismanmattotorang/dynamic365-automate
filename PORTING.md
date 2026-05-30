@@ -165,10 +165,11 @@ only as they land, so the tree always compiles.
 ### Phase 3b — live transports *(deferred)*
 - `HttpD365Client` (F&O OData v4 + Custom Service + `$batch` over Entra OAuth2) behind the `http` feature; live Metadata API client behind `d365-automate-meta/http`; connection-file loaders. The mock remains the default so CI without an environment is unaffected — mirroring the source's own "mock now, live later" phasing. Phase 4 (server) runs against the mock, so it is unblocked.
 
-### Phase 4 — MCP server (tools / resources / prompts / seed)
-- Re-map the 37 tools to `d365.*` / `xpp.meta.*` (full crosswalk in §6), 12 resources to `d365-*://`, 16 prompts, and the seed corpus.
-- Read-only-by-default safety gate, `--enable-writes`, `AGENTS.md` loader, elicitation workflows.
-- **Exit:** server integration tests pass; `tools/list` shows the D365 surface.
+### ✅ Phase 4 — MCP server (tools / resources / prompts / seed) *(done)*
+- `apps/d365-automate-server`: re-mapped the tool surface to `d365.*` / `xpp.meta.*` per §6 (37 tools across rag / service / meta / graph / workflow groups), resources to `d365-*://` (env, entity, service, meta, cache, guardrails), prompts (`d365.review-service-call`, `d365.deploy-impact-analysis`, `xpp.review-cross-reference` + disk-loaded skills), and the D365 seed corpus.
+- Read-only-by-default exposure policy, `--enable-writes`, `AGENTS.md` loader, atomic `$batch` commit path on `d365.service.call`, audit logging, and the three elicitation workflows (`create_purchase_order`, `maintain_customer`, `deploy_package`).
+- **Swappable backends (per request):** the server holds `Arc<dyn D365Client>` + `Arc<dyn MetadataClient>`, defaulting to the mocks. Pointing at a live environment is a one-site change in `lib.rs` / `main.rs` (construct the Phase 3b `HttpD365Client` instead of the mock) — no tool/resource/prompt code changes.
+- **Exit:** binary runs (stdio + HTTP `/health`, `/metrics`, `/mcp`); 137 tests pass (7 new server integration tests), clippy clean. ✅ *Done — see CHANGELOG 0.4.0.*
 
 ### Phase 5 — Apps
 - `d365-automate-tui` (Ratatui console), `d365-automate-gw` (gateway), `d365-automate-ingest`, `d365-automate-bench`, `sample-server`/`sample-client`.

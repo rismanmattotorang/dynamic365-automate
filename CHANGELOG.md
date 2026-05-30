@@ -10,6 +10,48 @@ GaussianTech. See [`PORTING.md`](PORTING.md) for the phased strategy.
 
 ---
 
+## [0.4.0] — 2026-05-30 · MCP server (Phase 4)
+
+Wires the backend tier into a runnable MCP server: `apps/d365-automate-server`.
+Backends are held behind trait objects and default to the offline mocks, so a
+production swap is a one-site change — no tool/resource/prompt edits.
+
+### Added — `apps/d365-automate-server`
+
+- **Tools** (re-mapped per the crosswalk):
+  - RAG: `xpp.search`, `flow.find_process`, `app.search_solutions`,
+    `d365.learn.search`, `d365.kb.navigate`.
+  - Service/entity: `d365.env.{info,health,cache_stats,cache_invalidate}`,
+    `d365.service.{search,metadata,bulk_metadata,call}`,
+    `d365.entity.{read,structure}`, `d365.docs.search`, `d365.infolog.parse`,
+    `d365.customer.{search,get}`.
+  - Metadata: `xpp.meta.{get_class,get_interface,get_table,get_job,
+    get_data_entity,get_model_contents,search,cross_reference,
+    get_entity_contents,deploy}`.
+  - Graph: `kb.{multi_hop,global_query,summarise,graph_neighborhood}`.
+  - Workflows (gated writes, elicitation): `d365.workflow.{create_purchase_order,
+    maintain_customer,deploy_package}`.
+- **Resources**: `d365-env://info`, `d365-entity://{name}/structure`,
+  `d365-service://{name}`, `d365-meta://info`, `d365-cache://stats`,
+  `agents://guardrails`.
+- **Prompts**: `d365.review-service-call`, `d365.deploy-impact-analysis`,
+  `xpp.review-cross-reference`, plus disk-loaded skills.
+- Read-only-by-default exposure policy (`ExposurePolicy::ReadOnlyOnly`),
+  `--enable-writes`, atomic `$batch` commit path on `d365.service.call`,
+  audit logging, `AGENTS.md` loader, completion providers, and the
+  Dynamics 365 seed corpus.
+- stdio + HTTP transports (`/health`, `/metrics`, `/mcp`), Entra-credential
+  resolution, and a swappable backend seam documented in `lib.rs`.
+
+### Verified
+
+- `cargo build --release` — binary runs; HTTP `/health` → `ok`, `initialize`
+  returns capabilities + guardrails.
+- `cargo clippy --all-features` — no warnings.
+- `cargo test --all-features` — **137 passing** (130 + 7 server integration).
+
+---
+
 ## [0.3.0] — 2026-05-30 · Dynamics 365 backend tier (Phase 3)
 
 The core engineering of the port: rewrites the two SAP backend crates against
