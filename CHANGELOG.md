@@ -10,6 +10,26 @@ GaussianTech. See [`PORTING.md`](PORTING.md) for the phased strategy.
 
 ---
 
+## [0.6.0] — 2026-05-30 · Web UI (Phase 6)
+
+Ports the Next.js 14 operator console (`apps/web`) and re-grounds it in D365.
+
+### Added — `apps/web`
+
+- Six routes: Operations, Query Lab, Graph Lab, Tool Explorer, Skill Lab,
+  Resources; the `/api/mcp` same-origin proxy targets the D365 MCP server.
+- Re-grounded demo content: tool names (`d365.*` / `xpp.meta.*`), Operations
+  tool grouping + synthetic traffic + service-metadata cache panel, Query Lab
+  domain selector (`learn`/`xpp`/`flow`/`solution`) + example queries + URI
+  colour map, Graph Lab entity-kind colours + examples, Skill Lab copy.
+
+### Verified
+
+- `npm install` + `npx next build` succeed — all 9 build outputs compile and
+  TypeScript type-checks pass.
+
+---
+
 ## [0.5.0] — 2026-05-30 · Apps (Phase 5)
 
 Ports the remaining binaries and re-grounds their demo content in Dynamics 365.

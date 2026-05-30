@@ -176,9 +176,10 @@ only as they land, so the tree always compiles.
 - Re-grounded: TUI synthetic traffic + cache panel, gateway intent router / `match_skill` (D365 skills + keywords) and tool routing, bench workload queries (RAG + graph) and the `./docs/sample-learn-corpus`, ingest crawler (`LearnCrawler`). `sample-client`/`gw` spawn `d365-automate-server` by default.
 - **Exit:** all six binaries build; clippy clean across `--all-targets`; bench passes both acceptance gates against the seeded Learn corpus (RAG P95 0.074 ms, graph multi-hop P95 0.084 ms); `sample-client` drives the server and lists the full D365 tool surface; 137 tests pass. ✅ *Done — see CHANGELOG 0.5.0.*
 
-### Phase 6 — Web UI
-- Rebrand the Next.js app (Operations / Query Lab / Graph Lab / Tool Explorer / Skill Lab / Resources); relabel SAP→D365 throughout.
-- **Exit:** `next build` succeeds; routes render against the HTTP server.
+### ✅ Phase 6 — Web UI *(done)*
+- Ported the Next.js 14 app (`apps/web`): Operations, Query Lab, Graph Lab, Tool Explorer, Skill Lab, Resources. Rebranded to D365-Automate; the `/api/mcp` proxy targets the D365 server.
+- Re-grounded all demo content: tool names (`d365.*` / `xpp.meta.*`), the Operations tool grouping + synthetic traffic, the Query Lab domain selector (`learn`/`xpp`/`flow`/`solution`) + example queries + URI colour map, the Graph Lab entity-kind colours + examples, and the Skill Lab copy.
+- **Exit:** `npm install` + `npx next build` succeed — all 9 routes compile and TypeScript type-checks pass. ✅ *Done — see CHANGELOG 0.6.0.*
 
 ### Phase 7 — Deploy & CI
 - `deploy/Dockerfile`, `deploy/k8s/*`, Grafana dashboard, `.github/workflows/{ci,release}.yml`, example connection TOML — rebranded image/paths/env.

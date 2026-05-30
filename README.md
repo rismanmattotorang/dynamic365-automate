@@ -38,7 +38,7 @@
 | 3 | Dynamics 365 backend tier (`d365-automate-odata`, `d365-automate-meta`) | ✅ Done — 130 tests passing (live HTTP transports → 3b) |
 | 4 | MCP server: tools / resources / prompts / seed | ✅ Done — 137 tests passing; binary serves stdio + HTTP |
 | 5 | Apps (TUI, gateway, ingest, bench, samples) | ✅ Done — all six binaries build & run; bench passes acceptance gates |
-| 6 | Web UI (Next.js) | ⏳ Planned |
+| 6 | Web UI (Next.js) | ✅ Done — `next build` passes (9 routes) |
 | 7 | Deploy & CI | ⏳ Planned |
 | 8 | Skills & docs | ⏳ Planned |
 
@@ -66,10 +66,20 @@ curl http://127.0.0.1:3030/metrics     # → Prometheus exposition
 ./target/release/d365-automate-server --enable-writes
 ```
 
+### Try the web UI
+
+```bash
+./target/release/d365-automate-server --transport http --bind 127.0.0.1:3030 &
+cd apps/web && npm install && npx next dev
+# → http://localhost:3000
+```
+
+Six routes: **Operations**, **Query Lab**, **Graph Lab**, **Tool Explorer**,
+**Skill Lab**, **Resources**.
+
 The server runs against the **offline Dynamics 365 mocks** by default, so it is
 fully exercisable without an environment. Pointing it at a live tenant is a
 one-site swap (see [`PORTING.md`](PORTING.md) §3b / `apps/d365-automate-server/src/lib.rs`).
-The web UI lands in a later phase (see the status table).
 
 ---
 
