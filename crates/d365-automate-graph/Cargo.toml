@@ -1,0 +1,15 @@
+[package]
+name = "d365-automate-graph"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "D365-Automate cross-domain knowledge graph: entities, edges, communities, Personalised PageRank, RAPTOR trees."
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

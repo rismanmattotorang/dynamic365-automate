@@ -1,0 +1,17 @@
+[package]
+name = "d365-automate-rag"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "D365-Automate layered RAG engine (Phase 3 / Phase 5A)."
+
+[dependencies]
+d365-automate-kb = { workspace = true }
+d365-automate-graph = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+async-trait = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

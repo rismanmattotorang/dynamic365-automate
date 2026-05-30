@@ -145,10 +145,16 @@ only as they land, so the tree always compiles.
 - Port `mcp-core`, `mcp-transport`, `mcp-server`, `mcp-client` verbatim; strip the handful of `sap` doc/env references.
 - **Exit:** 18 MCP tests pass. ✅ *Done — see CHANGELOG 0.1.0.*
 
-### Phase 2 — ERP-agnostic engines + agentic layer
-- Port `rag`, `graph`, `kb`, `ingest`, `memory`, `scheduler`, `channels`, `observability`, `connectors` as `d365-automate-*`.
-- Mechanical rename; re-target the ingest crawler allowlist to `learn.microsoft.com`; remap connector traits (`AbapConnector`→`XppConnector`, keep `BpmnConnector` for Power Automate flows, `LeanixConnector`→`SolutionConnector`).
-- **Exit:** retrieval/graph/crawler unit tests pass under new names.
+### ✅ Phase 2 — ERP-agnostic engines + agentic layer *(done)*
+- Ported `rag`, `graph`, `kb`, `ingest`, `memory`, `scheduler`, `channels`, `observability`, `skills`, `connectors` as `d365-automate-*`.
+- Re-grounded the domain surfaces in Dynamics 365 canon:
+  - `graph::EntityKind` (`AbapObject`→`XppObject`, `Table`→`DataEntity`, `Rfc`→`Service`, `BpmnProcess`→`Flow`, `LeanixApp`→`Solution`, `HelpPage`→`LearnPage`) + `EdgeKind` (`ReadsTable`→`ReadsEntity`, `WritesTable`→`WritesEntity`, `Includes`→`Uses`).
+  - The seed knowledge graph: the SAP FI journal-posting fixture (ABAP→BAPI→DDIC→LeanIX) re-cast as a Dynamics 365 GL posting fixture (`GTFinPostJournal` X++ job → `LedgerGeneralJournalEntry` service → `LedgerJournalTrans`/`GeneralJournalAccountEntry` entities → `FIN-CORE` solution).
+  - `kb::Domain` (`SapHelp`→`Learn`, `Abap`→`Xpp`, `Bpmn`→`Flow`, `Leanix`→`Solution`).
+  - Ingest crawler retargeted to Microsoft Learn (`HelpPortalCrawler`→`LearnCrawler`, `parse_help_portal_html`→`parse_learn_html`, `help.sap.com`→`learn.microsoft.com`); demo corpus re-grounded in D365 Finance.
+  - Connector traits (`AbapConnector`→`XppConnector`, `BpmnConnector`→`FlowConnector`, `LeanixConnector`→`SolutionConnector`).
+  - Observability audit field `sap_system`→`environment`; metrics `sap_rfc_calls_total`→`d365_service_calls_total`, etc.
+- **Exit:** 86 tests pass, clippy clean. ✅ *Done — see CHANGELOG 0.2.0.*
 
 ### Phase 3 — Dynamics 365 backend tier *(the core engineering)*
 - **`d365-automate-odata`** (was `sap-automate-rfc`): F&O OData v4 client, Custom Service caller, `$batch` change-set transaction model, Entra OAuth2 client-credentials auth, metadata cache, retry/pool, Infolog/error taxonomy. Replaces RFC/BAPI/SOAP-RFC.
